@@ -1,0 +1,65 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net8.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UseWPF>true</UseWPF>
+		<PlatformTarget>x64</PlatformTarget>
+		<Platforms>AnyCPU;x64</Platforms>
+		<ApplicationIcon>Resources\Logo128.ico</ApplicationIcon>
+		<ProduceReferenceAssembly>True</ProduceReferenceAssembly>
+		<NeutralLanguage>es-ES</NeutralLanguage>
+		<SatelliteResourceLanguages>es-ES</SatelliteResourceLanguages>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+		<AnalysisLevel>latest</AnalysisLevel>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+		
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+		<DebugType>full</DebugType>
+		<GenerateAssemblyInfo>True</GenerateAssemblyInfo>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+		<DebugType>full</DebugType>
+		<GenerateAssemblyInfo>True</GenerateAssemblyInfo>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+		<DebugType>full</DebugType>
+		<GenerateAssemblyInfo>True</GenerateAssemblyInfo>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+		<DebugType>full</DebugType>
+		<GenerateAssemblyInfo>True</GenerateAssemblyInfo>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Remove="Resources\Logo128.ico" />
+		<None Remove="Resources\Logo16.ico" />
+		<None Remove="Resources\Logo32.ico" />
+		<None Remove="Resources\Logo64.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Page Remove="Resources\SECColors.xaml" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Resource Include="Resources\Logo128.ico" />
+		<Resource Include="Resources\Logo16.ico" />
+		<Resource Include="Resources\Logo32.ico" />
+		<Resource Include="Resources\Logo64.ico" />
+		<Resource Include="Resources\SECColors.xaml" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Properties\" />
+	</ItemGroup>
+
+</Project>

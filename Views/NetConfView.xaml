@@ -1,0 +1,173 @@
+﻿<Window x:Class="wpfhikip.Views.NetConfView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:wpfhikip.Views"
+        xmlns:viewModel="clr-namespace:wpfhikip.ViewModels"
+        mc:Ignorable="d"
+        Title="NetConfView" Height="450" Width="800">
+    <Window.DataContext>
+        <viewModel:NetConfViewModel/>
+    </Window.DataContext>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="50" />
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0">
+            <ScrollViewer VerticalScrollBarVisibility="Visible">
+                <DataGrid x:Name="dataGrid"
+                          AutoGenerateColumns="False"
+                          CanUserSortColumns="False"
+                          CanUserAddRows="False"
+                          SelectionUnit="Cell"
+                          ClipboardCopyMode="ExcludeHeader"
+                          Height="600"
+                          ItemsSource="{Binding CameraRow, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    PreviewKeyDown="DataGrid_PreviewKeyDown"
+                          >
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow">
+                            <Setter Property="Background"
+                                    Value="{Binding RowColor}" />
+                        </Style>
+                    </DataGrid.RowStyle>
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Header="Select">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridComboBoxColumn Header="Model"
+                                                SelectedItemBinding="{Binding Model}">
+                            <DataGridComboBoxColumn.ElementStyle>
+                                <Style TargetType="{x:Type ComboBox}">
+                                    <Setter Property="ItemsSource"
+                                            Value="{Binding Path=DataContext.ModelOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+                                </Style>
+                            </DataGridComboBoxColumn.ElementStyle>
+                            <DataGridComboBoxColumn.EditingElementStyle>
+                                <Style TargetType="{x:Type ComboBox}">
+                                    <Setter Property="ItemsSource"
+                                            Value="{Binding Path=DataContext.ModelOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+                                </Style>
+                            </DataGridComboBoxColumn.EditingElementStyle>
+                        </DataGridComboBoxColumn>
+                        <DataGridTextColumn Header="Current IP"
+                                            Binding="{Binding CurrentIP}">
+                            <DataGridTextColumn.CellStyle>
+                                <Style TargetType="DataGridCell">
+                                    <Setter Property="FontWeight"
+                                            Value="{Binding CellFontWeight}" />
+                                </Style>
+                            </DataGridTextColumn.CellStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="New IP"
+                                            Binding="{Binding NewIP}" />
+                        <DataGridTextColumn Header="New Mask"
+                                            Binding="{Binding NewMask}" />
+                        <DataGridTextColumn Header="New Gateway"
+                                            Binding="{Binding NewGateway}" />
+                        <DataGridTextColumn Header="New NTP Server"
+                                            Binding="{Binding NewNTPServer}" />
+                        <DataGridTextColumn Header="User"
+                                            Binding="{Binding User}" />
+                        <DataGridTextColumn Header="Password"
+                                            Binding="{Binding Password}" />
+                        <DataGridTextColumn Header="Network Status"
+                                            Binding="{Binding OnlineStatus}"
+                                            IsReadOnly="True">
+                            <DataGridTextColumn.CellStyle>
+                                <Style TargetType="DataGridCell">
+                                    <Setter Property="Background"
+                                            Value="{Binding CellColor}" />
+                                </Style>
+                            </DataGridTextColumn.CellStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="Request Status"
+                                            Binding="{Binding Status}"
+                                            IsReadOnly="True" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </ScrollViewer>
+        </StackPanel>
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Left"
+                    FlowDirection="LeftToRight">
+            <Button x:Name="addButton"
+                    Content="Add"
+                    Command="{Binding AddCameraCommand}"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Right"
+                    Width="100"
+                    Height="30"
+                    Margin="10" />
+            <Button x:Name="addRangeButton"
+                    Content="Add range"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Right"
+                    Width="100"
+                    Height="30"
+                    Margin="10" />
+            <Button x:Name="saveButton"
+                    Content="Save"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Right"
+                    Width="100"
+                    Height="30"
+                    Margin="10" />
+            <Button x:Name="loadButton"
+                    Content="Load"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Right"
+                    Width="100"
+                    Height="30"
+                    Margin="10" />
+            <!--
+            <Button x:Name="addRowButton"
+                    Content="Add Row"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Right"
+                    Width="100"
+                    Height="30"
+                    Margin="10"
+                    Click="AddRowButton_Click" />
+            <Button x:Name="deleteSelectedRowsButton"
+                    Content="Delete Rows"
+                    Width="100"
+                    Height="30"
+                    Margin="10"
+                    Click="DeleteSelectedRowsButton_Click" />
+            <Button x:Name="sendRequestButton"
+                    Content="Send Request"
+                    Width="100"
+                    Height="30"
+                    Margin="10"
+                    Click="SendNetworkConfigRequestButton_Click" />
+            <Button x:Name="sendNTPButton"
+                    Content="Send NTP"
+                    Width="100"
+                    Height="30"
+                    Margin="10"
+                    Click="SendNTPServerButton_Click" />
+            <Button x:Name="selectAll"
+                    Content="Select All"
+                    Width="100"
+                    Height="30"
+                    Margin="10"
+                    Click="SelectAll_Click" />
+            <Button x:Name="importCSVFileButton"
+                    Content="Import CSV"
+                    Width="100"
+                    Height="30"
+                    Margin="10"
+                    Click="ImportCSVFileButton_Click" />
+            -->
+        </StackPanel>
+    </Grid>
+</Window>

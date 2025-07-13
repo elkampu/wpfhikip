@@ -1,0 +1,19 @@
+﻿Manufacturers:
+-2N
+-Aiphone
+-Arecont
+-Avigilon
+-Axis
+-Bosch
+-Dahua
+-Flir
+-Hanwha
+-Hikvision
+-Honeywell
+-Idis
+-Panasonic (i-Pro)
+-Mobotix
+-Onvif
+-Pelco
+-Siemens
+-Uniview

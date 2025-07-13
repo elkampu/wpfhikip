@@ -1,0 +1,40 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Reds -->
+    <SolidColorBrush x:Key="SEC_LightRed"
+                     Color="#FF8DA3" />
+    <SolidColorBrush x:Key="SEC_MidRed"
+                     Color="#AA1834" />
+    <SolidColorBrush x:Key="SEC_DarkRed"
+                     Color="#641432" />
+    <SolidColorBrush x:Key="SEC_InfoRed"
+                     Color="#FC273F" />
+
+    <!-- Blues -->
+    <SolidColorBrush x:Key="SEC_NavyBlue"
+                     Color="#031F30" />
+    <SolidColorBrush x:Key="SEC_LightBlue"
+                     Color="#ACC2DD" />
+    <SolidColorBrush x:Key="SEC_MidBlue"
+                     Color="#42638C" />
+
+    <!-- Purples -->
+    <SolidColorBrush x:Key="SEC_PurpleAccent"
+                     Color="#8D5FFF" />
+    <SolidColorBrush x:Key="SEC_LightPurple"
+                     Color="#C2B4FC" />
+    <SolidColorBrush x:Key="SEC_MidPurple"
+                     Color="#55419E" />
+    <SolidColorBrush x:Key="SEC_DarkPurple"
+                     Color="#26224C" />
+
+    <!-- Grays & Neutrals -->
+    <SolidColorBrush x:Key="SEC_White"
+                     Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SEC_LightGrey"
+                     Color="#D7D8D6" />
+    <SolidColorBrush x:Key="SEC_MidGrey"
+                     Color="#9C9EA0" />
+    <SolidColorBrush x:Key="SEC_DarkGrey"
+                     Color="#53565A" />
+</ResourceDictionary>

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -124,6 +125,20 @@ namespace wpfhikip.ViewModels
             }
         }
 
+        private async Task<bool> PingCameraAsync(string ipAddress, int timeoutMs = 3000)
+        {
+            try
+            {
+                using var ping = new Ping();
+                var reply = await ping.SendPingAsync(ipAddress, timeoutMs);
+                return reply.Status == IPStatus.Success;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private async Task CheckSingleCameraCompatibilityAsync(NetworkConfiguration config)
         {
             try
@@ -131,30 +146,42 @@ namespace wpfhikip.ViewModels
                 // Update status to show we're checking
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    config.Status = "Checking compatibility...";
+                    config.Status = "Checking connectivity...";
                     config.CellColor = Brushes.LightYellow;
+                });
+
+                // First, check ping connectivity
+                var isPingSuccessful = await PingCameraAsync(config.CurrentIP);
+                if (!isPingSuccessful)
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        config.Status = "Camera not reachable (ping failed)";
+                        config.CellColor = Brushes.LightCoral;
+                    });
+                    return;
+                }
+
+                // Update status to show ping was successful
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    config.Status = "Ping successful, checking protocols...";
                 });
 
                 // Default port if not specified
                 int port = 80;
 
-                // Try Hikvision first
-                var hikvisionCompatible = await CheckHikvisionCompatibilityAsync(config, port);
-                if (hikvisionCompatible)
-                    return;
+                // Create list of protocols to check, prioritizing the selected model
+                var protocolsToCheck = GetProtocolCheckOrder(config.Model);
 
-                // Try Dahua if Hikvision failed
-                var dahuaCompatible = await CheckDahuaCompatibilityAsync(config, port);
-                if (dahuaCompatible)
-                    return;
+                // Try each protocol in order
+                foreach (var protocol in protocolsToCheck)
+                {
+                    bool isCompatible = await CheckProtocolCompatibilityAsync(config, port, protocol);
+                    if (isCompatible)
+                        return; // Stop checking once we find a compatible protocol
+                }
 
-                // Try Axis if Dahua failed
-                var axisCompatible = await CheckAxisCompatibilityAsync(config, port);
-                if (axisCompatible)
-                    return;
-                var onvifCompatible = await CheckOnvifCompatibilityAsync(config, port);
-                if (onvifCompatible)
-                    return;
                 // If none worked, mark as incompatible
                 Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -170,6 +197,34 @@ namespace wpfhikip.ViewModels
                     config.CellColor = Brushes.Red;
                 });
             }
+        }
+
+        private List<string> GetProtocolCheckOrder(string selectedModel)
+        {
+            var allProtocols = new List<string> { "Hikvision", "Dahua", "Axis", "Onvif" };
+
+            // If a model is selected, prioritize it
+            if (!string.IsNullOrEmpty(selectedModel) && allProtocols.Contains(selectedModel))
+            {
+                var orderedProtocols = new List<string> { selectedModel };
+                orderedProtocols.AddRange(allProtocols.Where(p => p != selectedModel));
+                return orderedProtocols;
+            }
+
+            // Default order if no model is selected
+            return allProtocols;
+        }
+
+        private async Task<bool> CheckProtocolCompatibilityAsync(NetworkConfiguration config, int port, string protocol)
+        {
+            return protocol switch
+            {
+                "Hikvision" => await CheckHikvisionCompatibilityAsync(config, port),
+                "Dahua" => await CheckDahuaCompatibilityAsync(config, port),
+                "Axis" => await CheckAxisCompatibilityAsync(config, port),
+                "Onvif" => await CheckOnvifCompatibilityAsync(config, port),
+                _ => false
+            };
         }
 
         private async Task<bool> CheckHikvisionCompatibilityAsync(NetworkConfiguration config, int port)

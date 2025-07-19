@@ -8,13 +8,14 @@
         mc:Ignorable="d"
         Title="NetConfView" Height="450" Width="800">
     <Window.DataContext>
-        <viewModel:NetConfViewModel/>
+        <viewModel:NetConfViewModel />
     </Window.DataContext>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
-            <RowDefinition Height="50" />
+            <RowDefinition Height="60" />
         </Grid.RowDefinitions>
+
         <StackPanel Grid.Row="0">
             <ScrollViewer VerticalScrollBarVisibility="Visible">
                 <DataGrid x:Name="dataGrid"
@@ -25,8 +26,7 @@
                           ClipboardCopyMode="ExcludeHeader"
                           Height="600"
                           ItemsSource="{Binding CameraRow, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                    PreviewKeyDown="DataGrid_PreviewKeyDown"
-                          >
+                          PreviewKeyDown="DataGrid_PreviewKeyDown">
                     <DataGrid.RowStyle>
                         <Style TargetType="DataGridRow">
                             <Setter Property="Background"
@@ -94,6 +94,7 @@
                 </DataGrid>
             </ScrollViewer>
         </StackPanel>
+
         <StackPanel Grid.Row="1"
                     Orientation="Horizontal"
                     VerticalAlignment="Bottom"
@@ -106,68 +107,71 @@
                     HorizontalAlignment="Right"
                     Width="100"
                     Height="30"
-                    Margin="10" />
-            <Button x:Name="addRangeButton"
-                    Content="Add range"
+                    Margin="5" />
+
+            <Button x:Name="deleteButton"
+                    Content="Delete Selected"
+                    Command="{Binding DeleteSelectedCommand}"
                     VerticalAlignment="Bottom"
                     HorizontalAlignment="Right"
                     Width="100"
                     Height="30"
-                    Margin="10" />
-            <Button x:Name="saveButton"
-                    Content="Save"
+                    Margin="5" />
+
+            <Button x:Name="selectAllButton"
+                    Content="Select All"
+                    Command="{Binding SelectAllCommand}"
                     VerticalAlignment="Bottom"
                     HorizontalAlignment="Right"
                     Width="100"
                     Height="30"
-                    Margin="10" />
-            <Button x:Name="loadButton"
-                    Content="Load"
+                    Margin="5" />
+
+            <Button x:Name="checkCompatibilityButton"
+                    Content="Check Compatibility"
+                    Command="{Binding CheckCompatibilityCommand}"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Right"
+                    Width="120"
+                    Height="30"
+                    Margin="5"
+                    IsEnabled="{Binding IsCheckingCompatibility, Converter={StaticResource InverseBooleanConverter}}" />
+
+            <Button x:Name="sendNetworkButton"
+                    Content="Send Network"
+                    Command="{Binding SendNetworkConfigCommand}"
                     VerticalAlignment="Bottom"
                     HorizontalAlignment="Right"
                     Width="100"
                     Height="30"
-                    Margin="10" />
-            <!--
-            <Button x:Name="addRowButton"
-                    Content="Add Row"
-                    VerticalAlignment="Bottom"
-                    HorizontalAlignment="Right"
-                    Width="100"
-                    Height="30"
-                    Margin="10"
-                    Click="AddRowButton_Click" />
-            <Button x:Name="deleteSelectedRowsButton"
-                    Content="Delete Rows"
-                    Width="100"
-                    Height="30"
-                    Margin="10"
-                    Click="DeleteSelectedRowsButton_Click" />
-            <Button x:Name="sendRequestButton"
-                    Content="Send Request"
-                    Width="100"
-                    Height="30"
-                    Margin="10"
-                    Click="SendNetworkConfigRequestButton_Click" />
+                    Margin="5" />
+
             <Button x:Name="sendNTPButton"
                     Content="Send NTP"
+                    Command="{Binding SendNTPConfigCommand}"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Right"
                     Width="100"
                     Height="30"
-                    Margin="10"
-                    Click="SendNTPServerButton_Click" />
-            <Button x:Name="selectAll"
-                    Content="Select All"
+                    Margin="5" />
+
+            <Button x:Name="saveButton"
+                    Content="Save"
+                    Command="{Binding SaveConfigCommand}"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Right"
                     Width="100"
                     Height="30"
-                    Margin="10"
-                    Click="SelectAll_Click" />
-            <Button x:Name="importCSVFileButton"
-                    Content="Import CSV"
+                    Margin="5" />
+
+            <Button x:Name="loadButton"
+                    Content="Load"
+                    Command="{Binding LoadConfigCommand}"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Right"
                     Width="100"
                     Height="30"
-                    Margin="10"
-                    Click="ImportCSVFileButton_Click" />
-            -->
+                    Margin="5" />
         </StackPanel>
     </Grid>
 </Window>

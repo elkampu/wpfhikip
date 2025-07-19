@@ -217,201 +217,91 @@ namespace wpfhikip.ViewModels
 
         private async Task<bool> CheckProtocolCompatibilityAsync(NetworkConfiguration config, int port, string protocol)
         {
-            return protocol switch
-            {
-                "Hikvision" => await CheckHikvisionCompatibilityAsync(config, port),
-                "Dahua" => await CheckDahuaCompatibilityAsync(config, port),
-                "Axis" => await CheckAxisCompatibilityAsync(config, port),
-                "Onvif" => await CheckOnvifCompatibilityAsync(config, port),
-                _ => false
-            };
-        }
-
-        private async Task<bool> CheckHikvisionCompatibilityAsync(NetworkConfiguration config, int port)
-        {
             try
             {
-                using var connection = new HikvisionConnection(
-                    config.CurrentIP,
-                    port,
-                    config.User ?? "admin",
-                    config.Password ?? "");
-
-                var result = await connection.CheckCompatibilityAsync();
-
-                // Update UI on main thread
-                Application.Current.Dispatcher.Invoke(() =>
+                switch (protocol)
                 {
-                    if (result.Success && result.IsHikvisionCompatible)
-                    {
-                        config.Model = "Hikvision";
-                        config.CellColor = Brushes.LightGreen;
-
-                        if (result.RequiresAuthentication)
+                    case "Hikvision":
+                        using (var connection = new HikvisionConnection(config.CurrentIP, port, config.User ?? "admin", config.Password ?? ""))
                         {
-                            if (result.IsAuthenticated)
+                            var result = await connection.CheckCompatibilityAsync();
+                            if (result.Success && result.IsHikvisionCompatible)
                             {
-                                config.Status = "Hikvision compatible - Authentication OK";
-                            }
-                            else
-                            {
-                                config.Status = $"Hikvision compatible - Auth failed: {result.AuthenticationMessage}";
-                                config.CellColor = Brushes.Orange;
+                                UpdateConfigurationForProtocol(config, "Hikvision", result.RequiresAuthentication, result.IsAuthenticated, result.AuthenticationMessage);
+                                return true;
                             }
                         }
-                        else
-                        {
-                            config.Status = "Hikvision compatible - No auth required";
-                        }
-                    }
-                });
+                        break;
 
-                return result.Success && result.IsHikvisionCompatible;
+                    case "Dahua":
+                        using (var connection = new DahuaConnection(config.CurrentIP, port, config.User ?? "admin", config.Password ?? ""))
+                        {
+                            var result = await connection.CheckCompatibilityAsync();
+                            if (result.Success && result.IsDahuaCompatible)
+                            {
+                                UpdateConfigurationForProtocol(config, "Dahua", result.RequiresAuthentication, result.IsAuthenticated, result.AuthenticationMessage);
+                                return true;
+                            }
+                        }
+                        break;
+
+                    case "Axis":
+                        using (var connection = new AxisConnection(config.CurrentIP, port, config.User ?? "admin", config.Password ?? ""))
+                        {
+                            var result = await connection.CheckCompatibilityAsync();
+                            if (result.Success && result.IsAxisCompatible)
+                            {
+                                UpdateConfigurationForProtocol(config, "Axis", result.RequiresAuthentication, result.IsAuthenticated, result.AuthenticationMessage);
+                                return true;
+                            }
+                        }
+                        break;
+
+                    case "Onvif":
+                        using (var connection = new OnvifConnection(config.CurrentIP, port, config.User ?? "admin", config.Password ?? ""))
+                        {
+                            var result = await connection.CheckCompatibilityAsync();
+                            if (result.Success && result.IsOnvifCompatible)
+                            {
+                                UpdateConfigurationForProtocol(config, "ONVIF", result.RequiresAuthentication, result.IsAuthenticated, result.AuthenticationMessage);
+                                return true;
+                            }
+                        }
+                        break;
+                }
             }
             catch
             {
-                return false;
+                // Continue to next protocol if this one fails
             }
+
+            return false;
         }
 
-        private async Task<bool> CheckDahuaCompatibilityAsync(NetworkConfiguration config, int port)
+        private void UpdateConfigurationForProtocol(NetworkConfiguration config, string protocolName, bool requiresAuthentication, bool isAuthenticated, string authenticationMessage)
         {
-            try
+            Application.Current.Dispatcher.Invoke(() =>
             {
-                using var connection = new DahuaConnection(
-                    config.CurrentIP,
-                    port,
-                    config.User ?? "admin",
-                    config.Password ?? "");
+                config.Model = protocolName;
+                config.CellColor = Brushes.LightGreen;
 
-                var result = await connection.CheckCompatibilityAsync();
-
-                // Update UI on main thread
-                Application.Current.Dispatcher.Invoke(() =>
+                if (requiresAuthentication)
                 {
-                    if (result.Success && result.IsDahuaCompatible)
+                    if (isAuthenticated)
                     {
-                        config.Model = "Dahua";
-                        config.CellColor = Brushes.LightGreen;
-
-                        if (result.RequiresAuthentication)
-                        {
-                            if (result.IsAuthenticated)
-                            {
-                                config.Status = "Dahua compatible - Authentication OK";
-                            }
-                            else
-                            {
-                                config.Status = $"Dahua compatible - Auth failed: {result.AuthenticationMessage}";
-                                config.CellColor = Brushes.Orange;
-                            }
-                        }
-                        else
-                        {
-                            config.Status = "Dahua compatible - No auth required";
-                        }
+                        config.Status = $"{protocolName} compatible - Authentication OK";
                     }
-                });
-
-                return result.Success && result.IsDahuaCompatible;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private async Task<bool> CheckAxisCompatibilityAsync(NetworkConfiguration config, int port)
-        {
-            try
-            {
-                using var connection = new AxisConnection(
-                    config.CurrentIP,
-                    port,
-                    config.User ?? "admin",
-                    config.Password ?? "");
-
-                var result = await connection.CheckCompatibilityAsync();
-
-                // Update UI on main thread
-                Application.Current.Dispatcher.Invoke(() =>
+                    else
+                    {
+                        config.Status = $"{protocolName} compatible - Auth failed: {authenticationMessage}";
+                        config.CellColor = Brushes.Orange;
+                    }
+                }
+                else
                 {
-                    if (result.Success && result.IsAxisCompatible)
-                    {
-                        config.Model = "Axis";
-                        config.CellColor = Brushes.LightGreen;
-
-                        if (result.RequiresAuthentication)
-                        {
-                            if (result.IsAuthenticated)
-                            {
-                                config.Status = "Axis compatible - Authentication OK";
-                            }
-                            else
-                            {
-                                config.Status = $"Axis compatible - Auth failed: {result.AuthenticationMessage}";
-                                config.CellColor = Brushes.Orange;
-                            }
-                        }
-                        else
-                        {
-                            config.Status = "Axis compatible - No auth required";
-                        }
-                    }
-                });
-
-                return result.Success && result.IsAxisCompatible;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-        private async Task<bool> CheckOnvifCompatibilityAsync(NetworkConfiguration config, int port)
-        {
-            try
-            {
-                using var connection = new OnvifConnection(
-                    config.CurrentIP,
-                    port,
-                    config.User ?? "admin",
-                    config.Password ?? "");
-
-                var result = await connection.CheckCompatibilityAsync();
-
-                // Update UI on main thread
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    if (result.Success && result.IsOnvifCompatible)
-                    {
-                        config.Model = "ONVIF";
-                        config.CellColor = Brushes.LightGreen;
-
-                        if (result.RequiresAuthentication)
-                        {
-                            if (result.IsAuthenticated)
-                            {
-                                config.Status = "ONVIF compatible - Authentication OK";
-                            }
-                            else
-                            {
-                                config.Status = $"ONVIF compatible - Auth failed: {result.AuthenticationMessage}";
-                                config.CellColor = Brushes.Orange;
-                            }
-                        }
-                        else
-                        {
-                            config.Status = "ONVIF compatible - No auth required";
-                        }
-                    }
-                });
-
-                return result.Success && result.IsOnvifCompatible;
-            }
-            catch
-            {
-                return false;
-            }
+                    config.Status = $"{protocolName} compatible - No auth required";
+                }
+            });
         }
 
         private bool CanCheckCompatibility(object parameter)
@@ -570,8 +460,6 @@ namespace wpfhikip.ViewModels
                 return false;
             }
         }
-
-
 
         private bool CanSendNetworkConfig(object parameter)
         {

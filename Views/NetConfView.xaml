@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:wpfhikip.Views"
+        xmlns:controls="clr-namespace:wpfhikip.Controls"
         xmlns:viewModel="clr-namespace:wpfhikip.ViewModels"
         mc:Ignorable="d"
         Title="NetConfView" Height="450" Width="800">
@@ -56,23 +57,83 @@
                                 </Style>
                             </DataGridComboBoxColumn.EditingElementStyle>
                         </DataGridComboBoxColumn>
-                        <DataGridTextColumn Header="Current IP"
-                                            Binding="{Binding CurrentIP}">
-                            <DataGridTextColumn.CellStyle>
-                                <Style TargetType="DataGridCell">
-                                    <Setter Property="FontWeight"
-                                            Value="{Binding CellFontWeight}" />
-                                </Style>
-                            </DataGridTextColumn.CellStyle>
-                        </DataGridTextColumn>
-                        <DataGridTextColumn Header="New IP"
-                                            Binding="{Binding NewIP}" />
-                        <DataGridTextColumn Header="New Mask"
-                                            Binding="{Binding NewMask}" />
-                        <DataGridTextColumn Header="New Gateway"
-                                            Binding="{Binding NewGateway}" />
-                        <DataGridTextColumn Header="New NTP Server"
-                                            Binding="{Binding NewNTPServer}" />
+
+                        <!-- Current IP with custom IP control -->
+                        <DataGridTemplateColumn Header="Current IP"
+                                                Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding CurrentIP}"
+                                               FontWeight="{Binding CellFontWeight}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                            <DataGridTemplateColumn.CellEditingTemplate>
+                                <DataTemplate>
+                                    <controls:IpAddressControl IpAddress="{Binding CurrentIP, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellEditingTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- New IP with custom IP control -->
+                        <DataGridTemplateColumn Header="New IP"
+                                                Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding NewIP}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                            <DataGridTemplateColumn.CellEditingTemplate>
+                                <DataTemplate>
+                                    <controls:IpAddressControl IpAddress="{Binding NewIP, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellEditingTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- New Mask with custom IP control -->
+                        <DataGridTemplateColumn Header="New Mask"
+                                                Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding NewMask}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                            <DataGridTemplateColumn.CellEditingTemplate>
+                                <DataTemplate>
+                                    <controls:IpAddressControl IpAddress="{Binding NewMask, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellEditingTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- New Gateway with custom IP control -->
+                        <DataGridTemplateColumn Header="New Gateway"
+                                                Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding NewGateway}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                            <DataGridTemplateColumn.CellEditingTemplate>
+                                <DataTemplate>
+                                    <controls:IpAddressControl IpAddress="{Binding NewGateway, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellEditingTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- New NTP Server with custom IP control -->
+                        <DataGridTemplateColumn Header="New NTP Server"
+                                                Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding NewNTPServer}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                            <DataGridTemplateColumn.CellEditingTemplate>
+                                <DataTemplate>
+                                    <controls:IpAddressControl IpAddress="{Binding NewNTPServer, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellEditingTemplate>
+                        </DataGridTemplateColumn>
+
                         <DataGridTextColumn Header="User"
                                             Binding="{Binding User}" />
                         <DataGridTextColumn Header="Password"

@@ -1,0 +1,70 @@
+﻿<UserControl x:Class="wpfhikip.Controls.IpAddressControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:wpfhikip.Controls"
+             mc:Ignorable="d" 
+             d:DesignHeight="25" d:DesignWidth="140">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <TextBox x:Name="Octet1"
+                 Grid.Column="0"
+                 MaxLength="3"
+                 TextAlignment="Center"
+                 BorderThickness="1"
+                 Margin="1"
+                 VerticalContentAlignment="Center" />
+
+        <TextBlock Grid.Column="1"
+                   Text="."
+                   TextAlignment="Center"
+                   VerticalAlignment="Center"
+                   Margin="2,0" />
+
+        <TextBox x:Name="Octet2"
+                 Grid.Column="2"
+                 MaxLength="3"
+                 TextAlignment="Center"
+                 BorderThickness="1"
+                 Margin="1"
+                 VerticalContentAlignment="Center" />
+
+        <TextBlock Grid.Column="3"
+                   Text="."
+                   TextAlignment="Center"
+                   VerticalAlignment="Center"
+                   Margin="2,0" />
+
+        <TextBox x:Name="Octet3"
+                 Grid.Column="4"
+                 MaxLength="3"
+                 TextAlignment="Center"
+                 BorderThickness="1"
+                 Margin="1"
+                 VerticalContentAlignment="Center" />
+
+        <TextBlock Grid.Column="5"
+                   Text="."
+                   TextAlignment="Center"
+                   VerticalAlignment="Center"
+                   Margin="2,0" />
+
+        <TextBox x:Name="Octet4"
+                 Grid.Column="6"
+                 MaxLength="3"
+                 TextAlignment="Center"
+                 BorderThickness="1"
+                 Margin="1"
+                 VerticalContentAlignment="Center" />
+    </Grid>
+</UserControl>

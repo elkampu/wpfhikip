@@ -13,6 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 
 using wpfhikip.Controls;
+using wpfhikip.Views.Dialogs;
 
 namespace wpfhikip.Views
 {
@@ -52,6 +53,19 @@ namespace wpfhikip.Views
             {
                 PasteToSelectedCell();
                 e.Handled = true;
+            }
+        }
+        private void StatusTextBlock_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // Get the TextBlock that was clicked
+            if (sender is TextBlock textBlock && textBlock.Tag is NetworkConfiguration config)
+            {
+                // Open the status detail dialog
+                var statusDialog = new StatusDetailDialog(config)
+                {
+                    Owner = this
+                };
+                statusDialog.ShowDialog();
             }
         }
 

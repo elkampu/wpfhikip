@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace wpfhikip.Controls
 {
@@ -49,6 +50,11 @@ namespace wpfhikip.Controls
             Octet3.PreviewTextInput += TextBox_PreviewTextInput;
             Octet4.PreviewTextInput += TextBox_PreviewTextInput;
 
+            Octet1.PreviewKeyDown += TextBox_PreviewKeyDown;
+            Octet2.PreviewKeyDown += TextBox_PreviewKeyDown;
+            Octet3.PreviewKeyDown += TextBox_PreviewKeyDown;
+            Octet4.PreviewKeyDown += TextBox_PreviewKeyDown;
+
             Octet1.KeyDown += TextBox_KeyDown;
             Octet2.KeyDown += TextBox_KeyDown;
             Octet3.KeyDown += TextBox_KeyDown;
@@ -58,6 +64,11 @@ namespace wpfhikip.Controls
             Octet2.GotFocus += TextBox_GotFocus;
             Octet3.GotFocus += TextBox_GotFocus;
             Octet4.GotFocus += TextBox_GotFocus;
+
+            Octet1.LostFocus += TextBox_LostFocus;
+            Octet2.LostFocus += TextBox_LostFocus;
+            Octet3.LostFocus += TextBox_LostFocus;
+            Octet4.LostFocus += TextBox_LostFocus;
         }
 
         private void TextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
@@ -77,13 +88,17 @@ namespace wpfhikip.Controls
                 return;
             }
 
-            // Check if adding this character would exceed 3 digits or make value > 255
-            var textBox = sender as TextBox;
-            var currentText = textBox.Text;
-            var newText = currentText.Insert(textBox.CaretIndex, e.Text);
+            // Allow the input - we'll validate and correct in TextChanged event
+        }
 
-            if (newText.Length > 3 || !IsValidOctet(newText))
+        private void TextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            var textBox = sender as TextBox;
+
+            // Handle backspace in empty field
+            if (e.Key == Key.Back && string.IsNullOrEmpty(textBox.Text))
             {
+                MoveToPreviousTextBox(textBox);
                 e.Handled = true;
             }
         }
@@ -93,13 +108,38 @@ namespace wpfhikip.Controls
             var textBox = sender as TextBox;
             var text = textBox.Text;
 
-            // Auto-move to next field when 3 digits are entered
-            if (text.Length == 3 && IsValidOctet(text))
+            // Validate and correct the value if it's > 255
+            if (int.TryParse(text, out int value) && value > 255)
+            {
+                // Use Dispatcher to avoid recursion issues with TextChanged
+                Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+                {
+                    textBox.Text = "255";
+                    textBox.SelectAll();
+                }));
+                return;
+            }
+
+            // Check if we should auto-move to next field
+            if (ShouldMoveToNextField(text))
             {
                 MoveToNextTextBox(textBox);
             }
 
             UpdateIpAddressFromTextBoxes();
+        }
+
+        private void TextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            var text = textBox.Text;
+
+            // Final validation when losing focus
+            if (!string.IsNullOrEmpty(text) && int.TryParse(text, out int value) && value > 255)
+            {
+                textBox.Text = "255";
+                UpdateIpAddressFromTextBoxes();
+            }
         }
 
         private void TextBox_KeyDown(object sender, KeyEventArgs e)
@@ -125,16 +165,14 @@ namespace wpfhikip.Controls
                     }
                     break;
 
-                case Key.Back:
-                    if (textBox.CaretIndex == 0 && textBox.Text.Length == 0)
-                    {
-                        MoveToPreviousTextBox(textBox);
-                        e.Handled = true;
-                    }
-                    break;
-
                 case Key.Tab:
                     // Let normal tab handling work
+                    break;
+
+                case Key.Enter:
+                    // Move to next field on Enter
+                    MoveToNextTextBox(textBox);
+                    e.Handled = true;
                     break;
             }
         }
@@ -142,7 +180,28 @@ namespace wpfhikip.Controls
         private void TextBox_GotFocus(object sender, RoutedEventArgs e)
         {
             var textBox = sender as TextBox;
-            textBox.SelectAll();
+            // Use Dispatcher to ensure text is selected after the focus event completes
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+            {
+                textBox.SelectAll();
+            }));
+        }
+
+        private bool ShouldMoveToNextField(string text)
+        {
+            if (string.IsNullOrEmpty(text) || !int.TryParse(text, out int value))
+                return false;
+
+            // Move if it's a 3-digit valid octet
+            if (text.Length == 3 && IsValidOctet(text))
+                return true;
+
+            // Move if it's a 2-digit number that cannot accept another digit and still be valid
+            // This happens when the value is 26-99 (adding another digit would exceed 255)
+            if (text.Length == 2 && value >= 26)
+                return true;
+
+            return false;
         }
 
         private void MoveToNextTextBox(TextBox currentTextBox)
@@ -155,7 +214,11 @@ namespace wpfhikip.Controls
                 _ => null
             };
 
-            nextTextBox?.Focus();
+            if (nextTextBox != null)
+            {
+                nextTextBox.Focus();
+                nextTextBox.SelectAll();
+            }
         }
 
         private void MoveToPreviousTextBox(TextBox currentTextBox)

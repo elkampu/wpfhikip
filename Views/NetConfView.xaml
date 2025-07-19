@@ -7,25 +7,86 @@
         xmlns:controls="clr-namespace:wpfhikip.Controls"
         xmlns:viewModel="clr-namespace:wpfhikip.ViewModels"
         mc:Ignorable="d"
-        Title="NetConfView" Height="450" Width="800">
+        Title="Network Configuration Manager"
+        Height="600"
+        Width="1000">
     <Window.DataContext>
         <viewModel:NetConfViewModel />
     </Window.DataContext>
+    <Window.Resources>
+        <!-- Modern Button Style with bigger size -->
+        <Style x:Key="ModernButtonStyle"
+               TargetType="Button">
+            <Setter Property="Background"
+                    Value="#FF007ACC" />
+            <Setter Property="Foreground"
+                    Value="White" />
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="FontWeight"
+                    Value="Medium" />
+            <Setter Property="FontSize"
+                    Value="14" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Margin"
+                    Value="5" />
+            <Setter Property="Padding"
+                    Value="8,4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                BorderBrush="{TemplateBinding BorderBrush}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter Property="Background"
+                                        Value="#FF1F8AD6" />
+                            </Trigger>
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter Property="Background"
+                                        Value="#FF005A9E" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled"
+                                     Value="False">
+                                <Setter Property="Background"
+                                        Value="#FFB0B0B0" />
+                                <Setter Property="Foreground"
+                                        Value="#FF808080" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
-            <RowDefinition Height="60" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0">
-            <ScrollViewer VerticalScrollBarVisibility="Visible">
+            <ScrollViewer VerticalScrollBarVisibility="Visible"
+                          HorizontalScrollBarVisibility="Auto">
                 <DataGrid x:Name="dataGrid"
                           AutoGenerateColumns="False"
                           CanUserSortColumns="False"
                           CanUserAddRows="False"
+                          CanUserResizeColumns="False"
+                          CanUserReorderColumns="False"
                           SelectionUnit="Cell"
                           ClipboardCopyMode="ExcludeHeader"
-                          Height="600"
+                          Height="400"
+                          RowHeight="32"
                           ItemsSource="{Binding CameraRow, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                           PreviewKeyDown="DataGrid_PreviewKeyDown">
                     <DataGrid.RowStyle>
@@ -35,36 +96,58 @@
                         </Style>
                     </DataGrid.RowStyle>
                     <DataGrid.Columns>
-                        <DataGridTemplateColumn Header="Select">
+                        <!-- Select Column -->
+                        <DataGridTemplateColumn Header="☑"
+                                                Width="35"
+                                                MinWidth="35"
+                                                MaxWidth="35">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
+
+                        <!-- Model Column -->
                         <DataGridComboBoxColumn Header="Model"
+                                                Width="80"
+                                                MinWidth="80"
+                                                MaxWidth="80"
                                                 SelectedItemBinding="{Binding Model}">
                             <DataGridComboBoxColumn.ElementStyle>
                                 <Style TargetType="{x:Type ComboBox}">
                                     <Setter Property="ItemsSource"
                                             Value="{Binding Path=DataContext.ModelOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+                                    <Setter Property="FontSize"
+                                            Value="12" />
+                                    <Setter Property="HorizontalContentAlignment"
+                                            Value="Center" />
                                 </Style>
                             </DataGridComboBoxColumn.ElementStyle>
                             <DataGridComboBoxColumn.EditingElementStyle>
                                 <Style TargetType="{x:Type ComboBox}">
                                     <Setter Property="ItemsSource"
                                             Value="{Binding Path=DataContext.ModelOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+                                    <Setter Property="FontSize"
+                                            Value="12" />
                                 </Style>
                             </DataGridComboBoxColumn.EditingElementStyle>
                         </DataGridComboBoxColumn>
 
                         <!-- Current IP with custom IP control -->
                         <DataGridTemplateColumn Header="Current IP"
-                                                Width="150">
+                                                Width="110"
+                                                MinWidth="110"
+                                                MaxWidth="110">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding CurrentIP}"
-                                               FontWeight="{Binding CellFontWeight}" />
+                                               FontWeight="{Binding CellFontWeight}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="12" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                             <DataGridTemplateColumn.CellEditingTemplate>
@@ -76,10 +159,15 @@
 
                         <!-- New IP with custom IP control -->
                         <DataGridTemplateColumn Header="New IP"
-                                                Width="150">
+                                                Width="110"
+                                                MinWidth="110"
+                                                MaxWidth="110">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding NewIP}" />
+                                    <TextBlock Text="{Binding NewIP}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="12" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                             <DataGridTemplateColumn.CellEditingTemplate>
@@ -90,11 +178,16 @@
                         </DataGridTemplateColumn>
 
                         <!-- New Mask with custom IP control -->
-                        <DataGridTemplateColumn Header="New Mask"
-                                                Width="150">
+                        <DataGridTemplateColumn Header="Mask"
+                                                Width="110"
+                                                MinWidth="110"
+                                                MaxWidth="110">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding NewMask}" />
+                                    <TextBlock Text="{Binding NewMask}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="12" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                             <DataGridTemplateColumn.CellEditingTemplate>
@@ -105,11 +198,16 @@
                         </DataGridTemplateColumn>
 
                         <!-- New Gateway with custom IP control -->
-                        <DataGridTemplateColumn Header="New Gateway"
-                                                Width="150">
+                        <DataGridTemplateColumn Header="Gateway"
+                                                Width="110"
+                                                MinWidth="110"
+                                                MaxWidth="110">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding NewGateway}" />
+                                    <TextBlock Text="{Binding NewGateway}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="12" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                             <DataGridTemplateColumn.CellEditingTemplate>
@@ -120,11 +218,16 @@
                         </DataGridTemplateColumn>
 
                         <!-- New NTP Server with custom IP control -->
-                        <DataGridTemplateColumn Header="New NTP Server"
-                                                Width="150">
+                        <DataGridTemplateColumn Header="NTP"
+                                                Width="110"
+                                                MinWidth="110"
+                                                MaxWidth="110">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding NewNTPServer}" />
+                                    <TextBlock Text="{Binding NewNTPServer}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="12" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                             <DataGridTemplateColumn.CellEditingTemplate>
@@ -134,105 +237,178 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
 
+                        <!-- User Column -->
                         <DataGridTextColumn Header="User"
-                                            Binding="{Binding User}" />
-                        <DataGridTextColumn Header="Password"
-                                            Binding="{Binding Password}" />
-                        <DataGridTextColumn Header="Network Status"
+                                            Width="60"
+                                            MinWidth="60"
+                                            MaxWidth="60"
+                                            Binding="{Binding User}">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment"
+                                            Value="Center" />
+                                    <Setter Property="VerticalAlignment"
+                                            Value="Center" />
+                                    <Setter Property="FontSize"
+                                            Value="12" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- Password Column -->
+                        <DataGridTextColumn Header="Pass"
+                                            Width="60"
+                                            MinWidth="60"
+                                            MaxWidth="60"
+                                            Binding="{Binding Password}">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment"
+                                            Value="Center" />
+                                    <Setter Property="VerticalAlignment"
+                                            Value="Center" />
+                                    <Setter Property="FontSize"
+                                            Value="12" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- Network Status Column -->
+                        <DataGridTextColumn Header="Net"
+                                            Width="70"
+                                            MinWidth="70"
+                                            MaxWidth="70"
                                             Binding="{Binding OnlineStatus}"
                                             IsReadOnly="True">
                             <DataGridTextColumn.CellStyle>
                                 <Style TargetType="DataGridCell">
                                     <Setter Property="Background"
                                             Value="{Binding CellColor}" />
+                                    <Setter Property="HorizontalContentAlignment"
+                                            Value="Center" />
+                                    <Setter Property="VerticalContentAlignment"
+                                            Value="Center" />
                                 </Style>
                             </DataGridTextColumn.CellStyle>
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment"
+                                            Value="Center" />
+                                    <Setter Property="VerticalAlignment"
+                                            Value="Center" />
+                                    <Setter Property="FontSize"
+                                            Value="11" />
+                                    <Setter Property="FontWeight"
+                                            Value="Medium" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Header="Request Status"
-                                            Binding="{Binding Status}"
-                                            IsReadOnly="True" />
+
+                        <!-- Request Status Column with click functionality -->
+                        <DataGridTemplateColumn Header="Status"
+                                                Width="90"
+                                                MinWidth="90"
+                                                MaxWidth="90"
+                                                IsReadOnly="True">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding ShortStatus}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="11"
+                                               FontWeight="Medium"
+                                               Cursor="Hand"
+                                               ToolTip="Click to see detailed status logs"
+                                               MouseLeftButtonDown="StatusTextBlock_MouseLeftButtonDown"
+                                               Tag="{Binding}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                     </DataGrid.Columns>
                 </DataGrid>
             </ScrollViewer>
         </StackPanel>
 
-        <StackPanel Grid.Row="1"
-                    Orientation="Horizontal"
-                    VerticalAlignment="Bottom"
-                    HorizontalAlignment="Left"
-                    FlowDirection="LeftToRight">
-            <Button x:Name="addButton"
-                    Content="Add"
-                    Command="{Binding AddCameraCommand}"
-                    VerticalAlignment="Bottom"
-                    HorizontalAlignment="Right"
-                    Width="100"
-                    Height="30"
-                    Margin="5" />
+        <!-- Improved button layout with better spacing and grouping -->
+        <Grid Grid.Row="1"
+              Margin="10,15,10,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-            <Button x:Name="deleteButton"
-                    Content="Delete Selected"
-                    Command="{Binding DeleteSelectedCommand}"
-                    VerticalAlignment="Bottom"
-                    HorizontalAlignment="Right"
-                    Width="100"
-                    Height="30"
-                    Margin="5" />
+            <!-- Left group: Data management buttons -->
+            <StackPanel Grid.Column="0"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Left">
+                <Button x:Name="addButton"
+                        Content="Add Camera"
+                        Command="{Binding AddCameraCommand}"
+                        Width="100"
+                        Height="36"
+                        Style="{StaticResource ModernButtonStyle}" />
 
-            <Button x:Name="selectAllButton"
-                    Content="Select All"
-                    Command="{Binding SelectAllCommand}"
-                    VerticalAlignment="Bottom"
-                    HorizontalAlignment="Right"
-                    Width="100"
-                    Height="30"
-                    Margin="5" />
+                <Button x:Name="deleteButton"
+                        Content="Delete"
+                        Command="{Binding DeleteSelectedCommand}"
+                        Width="80"
+                        Height="36"
+                        Style="{StaticResource ModernButtonStyle}" />
 
-            <Button x:Name="checkCompatibilityButton"
-                    Content="Check Compatibility"
-                    Command="{Binding CheckCompatibilityCommand}"
-                    VerticalAlignment="Bottom"
-                    HorizontalAlignment="Right"
-                    Width="120"
-                    Height="30"
-                    Margin="5"
-                    IsEnabled="{Binding IsCheckingCompatibility, Converter={StaticResource InverseBooleanConverter}}" />
+                <Button x:Name="selectAllButton"
+                        Content="Select All"
+                        Command="{Binding SelectAllCommand}"
+                        Width="90"
+                        Height="36"
+                        Style="{StaticResource ModernButtonStyle}" />
+            </StackPanel>
 
-            <Button x:Name="sendNetworkButton"
-                    Content="Send Network"
-                    Command="{Binding SendNetworkConfigCommand}"
-                    VerticalAlignment="Bottom"
-                    HorizontalAlignment="Right"
-                    Width="100"
-                    Height="30"
-                    Margin="5" />
+            <!-- Center group: Operation buttons -->
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Center">
+                <Button x:Name="checkCompatibilityButton"
+                        Content="Check Compatibility"
+                        Command="{Binding CheckCompatibilityCommand}"
+                        Width="150"
+                        Height="36"
+                        IsEnabled="{Binding IsCheckingCompatibility, Converter={StaticResource InverseBooleanConverter}}"
+                        Style="{StaticResource ModernButtonStyle}" />
 
-            <Button x:Name="sendNTPButton"
-                    Content="Send NTP"
-                    Command="{Binding SendNTPConfigCommand}"
-                    VerticalAlignment="Bottom"
-                    HorizontalAlignment="Right"
-                    Width="100"
-                    Height="30"
-                    Margin="5" />
+                <Button x:Name="sendNetworkButton"
+                        Content="Send Network"
+                        Command="{Binding SendNetworkConfigCommand}"
+                        Width="120"
+                        Height="36"
+                        Style="{StaticResource ModernButtonStyle}" />
 
-            <Button x:Name="saveButton"
-                    Content="Save"
-                    Command="{Binding SaveConfigCommand}"
-                    VerticalAlignment="Bottom"
-                    HorizontalAlignment="Right"
-                    Width="100"
-                    Height="30"
-                    Margin="5" />
+                <Button x:Name="sendNTPButton"
+                        Content="Send NTP"
+                        Command="{Binding SendNTPConfigCommand}"
+                        Width="100"
+                        Height="36"
+                        Style="{StaticResource ModernButtonStyle}" />
+            </StackPanel>
 
-            <Button x:Name="loadButton"
-                    Content="Load"
-                    Command="{Binding LoadConfigCommand}"
-                    VerticalAlignment="Bottom"
-                    HorizontalAlignment="Right"
-                    Width="100"
-                    Height="30"
-                    Margin="5" />
-        </StackPanel>
+            <!-- Right group: File operations -->
+            <StackPanel Grid.Column="2"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button x:Name="saveButton"
+                        Content="Save Config"
+                        Command="{Binding SaveConfigCommand}"
+                        Width="100"
+                        Height="36"
+                        Style="{StaticResource ModernButtonStyle}" />
+
+                <Button x:Name="loadButton"
+                        Content="Load Config"
+                        Command="{Binding LoadConfigCommand}"
+                        Width="100"
+                        Height="36"
+                        Style="{StaticResource ModernButtonStyle}" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

@@ -6,14 +6,18 @@
         xmlns:local="clr-namespace:wpfhikip.Views"
         xmlns:controls="clr-namespace:wpfhikip.Controls"
         xmlns:viewModel="clr-namespace:wpfhikip.ViewModels"
+        xmlns:converters="clr-namespace:wpfhikip.Converters"
         mc:Ignorable="d"
         Title="Network Configuration Manager"
         Height="600"
-        Width="1000">
+        Width="1100">
     <Window.DataContext>
         <viewModel:NetConfViewModel />
     </Window.DataContext>
     <Window.Resources>
+        <!-- Add the missing converter -->
+        <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+
         <!-- Modern Button Style with bigger size -->
         <Style x:Key="ModernButtonStyle"
                TargetType="Button">
@@ -87,7 +91,7 @@
                           ClipboardCopyMode="ExcludeHeader"
                           Height="400"
                           RowHeight="32"
-                          ItemsSource="{Binding CameraRow, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                          ItemsSource="{Binding Cameras, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                           PreviewKeyDown="DataGrid_PreviewKeyDown">
                     <DataGrid.RowStyle>
                         <Style TargetType="DataGridRow">
@@ -111,15 +115,16 @@
                         </DataGridTemplateColumn>
 
                         <!-- Model Column -->
-                        <DataGridComboBoxColumn Header="Model"
+                        <DataGridComboBoxColumn Header="Protocol"
                                                 Width="80"
                                                 MinWidth="80"
                                                 MaxWidth="80"
-                                                SelectedItemBinding="{Binding Model}">
+                                                SelectedValueBinding="{Binding Protocol}"
+                                                SelectedValuePath=".">
                             <DataGridComboBoxColumn.ElementStyle>
                                 <Style TargetType="{x:Type ComboBox}">
                                     <Setter Property="ItemsSource"
-                                            Value="{Binding Path=DataContext.ModelOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+                                            Value="{Binding Path=DataContext.ProtocolOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
                                     <Setter Property="FontSize"
                                             Value="12" />
                                     <Setter Property="HorizontalContentAlignment"
@@ -129,7 +134,7 @@
                             <DataGridComboBoxColumn.EditingElementStyle>
                                 <Style TargetType="{x:Type ComboBox}">
                                     <Setter Property="ItemsSource"
-                                            Value="{Binding Path=DataContext.ModelOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+                                            Value="{Binding Path=DataContext.ProtocolOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
                                     <Setter Property="FontSize"
                                             Value="12" />
                                 </Style>
@@ -156,6 +161,34 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
+
+                        <!-- Custom Port Column - Moved right after Current IP -->
+                        <DataGridTextColumn Header="Port"
+                                            Width="50"
+                                            MinWidth="50"
+                                            MaxWidth="50"
+                                            Binding="{Binding Port}">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment"
+                                            Value="Center" />
+                                    <Setter Property="VerticalAlignment"
+                                            Value="Center" />
+                                    <Setter Property="FontSize"
+                                            Value="12" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                            <DataGridTextColumn.EditingElementStyle>
+                                <Style TargetType="TextBox">
+                                    <Setter Property="HorizontalContentAlignment"
+                                            Value="Center" />
+                                    <Setter Property="VerticalContentAlignment"
+                                            Value="Center" />
+                                    <Setter Property="FontSize"
+                                            Value="12" />
+                                </Style>
+                            </DataGridTextColumn.EditingElementStyle>
+                        </DataGridTextColumn>
 
                         <!-- New IP with custom IP control -->
                         <DataGridTemplateColumn Header="New IP"
@@ -242,7 +275,7 @@
                                             Width="60"
                                             MinWidth="60"
                                             MaxWidth="60"
-                                            Binding="{Binding User}">
+                                            Binding="{Binding Username}">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="HorizontalAlignment"

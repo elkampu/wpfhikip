@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
+using wpfhikip.Models;
+
 namespace wpfhikip.Protocols.Hikvision
 {
     public static class HikvisionXmlTemplates
@@ -79,30 +81,30 @@ namespace wpfhikip.Protocols.Hikvision
         }
 
         /// <summary>
-        /// Creates a modified XML for PUT request based on GET response
+        /// Creates a modified XML for PUT request based on GET response using Camera object
         /// </summary>
-        public static string CreatePutXmlFromGetResponse(string getResponseXml, NetworkConfiguration config, string endpoint)
+        public static string CreatePutXmlFromGetResponse(string getResponseXml, Camera camera, string endpoint)
         {
             return endpoint switch
             {
-                HikvisionUrl.NetworkInterfaceIpAddress => ModifyNetworkXml(getResponseXml, config),
-                HikvisionUrl.SystemTime => ModifyTimeXml(getResponseXml, config),
-                HikvisionUrl.NtpServers => ModifyNtpXml(getResponseXml, config),
+                HikvisionUrl.NetworkInterfaceIpAddress => ModifyNetworkXml(getResponseXml, camera),
+                HikvisionUrl.SystemTime => ModifyTimeXml(getResponseXml, camera),
+                HikvisionUrl.NtpServers => ModifyNtpXml(getResponseXml, camera),
                 _ => throw new ArgumentException($"Unsupported endpoint for XML modification: {endpoint}")
             };
         }
 
-        private static string ModifyNetworkXml(string originalXml, NetworkConfiguration config)
+        private static string ModifyNetworkXml(string originalXml, Camera camera)
         {
             var newValues = new Dictionary<string, string>();
 
-            if (!string.IsNullOrEmpty(config.NewIP))
-                newValues["ipAddress"] = config.NewIP;
+            if (!string.IsNullOrEmpty(camera.NewIP))
+                newValues["ipAddress"] = camera.NewIP;
 
-            if (!string.IsNullOrEmpty(config.NewMask))
-                newValues["subnetMask"] = config.NewMask;
+            if (!string.IsNullOrEmpty(camera.NewMask))
+                newValues["subnetMask"] = camera.NewMask;
 
-            if (!string.IsNullOrEmpty(config.NewGateway))
+            if (!string.IsNullOrEmpty(camera.NewGateway))
             {
                 // Handle nested gateway structure
                 var doc = XDocument.Parse(originalXml);
@@ -112,7 +114,7 @@ namespace wpfhikip.Protocols.Hikvision
                     var ipElement = gatewayElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "ipAddress");
                     if (ipElement != null)
                     {
-                        ipElement.Value = config.NewGateway;
+                        ipElement.Value = camera.NewGateway;
                     }
                 }
                 return doc.ToString();
@@ -121,7 +123,7 @@ namespace wpfhikip.Protocols.Hikvision
             return ModifyXmlTemplate(originalXml, newValues);
         }
 
-        private static string ModifyTimeXml(string originalXml, NetworkConfiguration config)
+        private static string ModifyTimeXml(string originalXml, Camera camera)
         {
             var newValues = new Dictionary<string, string>
             {
@@ -131,9 +133,9 @@ namespace wpfhikip.Protocols.Hikvision
             return ModifyXmlTemplate(originalXml, newValues);
         }
 
-        private static string ModifyNtpXml(string originalXml, NetworkConfiguration config)
+        private static string ModifyNtpXml(string originalXml, Camera camera)
         {
-            if (string.IsNullOrEmpty(config.NewNTPServer))
+            if (string.IsNullOrEmpty(camera.NewNTPServer))
                 return originalXml;
 
             try
@@ -146,7 +148,7 @@ namespace wpfhikip.Protocols.Hikvision
                     var ipElement = ntpServerElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "ipAddress");
                     if (ipElement != null)
                     {
-                        ipElement.Value = config.NewNTPServer;
+                        ipElement.Value = camera.NewNTPServer;
                     }
                 }
 
@@ -157,38 +159,38 @@ namespace wpfhikip.Protocols.Hikvision
                 // Fallback to template-based approach
                 var newValues = new Dictionary<string, string>
                 {
-                    ["ipAddress"] = config.NewNTPServer
+                    ["ipAddress"] = camera.NewNTPServer
                 };
                 return ModifyXmlTemplate(originalXml, newValues);
             }
         }
 
         /// <summary>
-        /// Compares current and new configurations to determine what needs updating
+        /// Compares current and new configurations to determine what needs updating using Camera object
         /// </summary>
-        public static bool HasConfigurationChanged(string currentXml, NetworkConfiguration config, string endpoint)
+        public static bool HasConfigurationChanged(string currentXml, Camera camera, string endpoint)
         {
             var currentValues = ParseResponseXml(currentXml);
 
             return endpoint switch
             {
-                HikvisionUrl.NetworkInterfaceIpAddress => HasNetworkConfigChanged(currentValues, config),
-                HikvisionUrl.NtpServers => HasNtpConfigChanged(currentValues, config),
+                HikvisionUrl.NetworkInterfaceIpAddress => HasNetworkConfigChanged(currentValues, camera),
+                HikvisionUrl.NtpServers => HasNtpConfigChanged(currentValues, camera),
                 _ => true // Default to updating if we can't determine
             };
         }
 
-        private static bool HasNetworkConfigChanged(Dictionary<string, string> currentValues, NetworkConfiguration config)
+        private static bool HasNetworkConfigChanged(Dictionary<string, string> currentValues, Camera camera)
         {
-            return (currentValues.GetValueOrDefault("ipAddress") != config.NewIP) ||
-                   (currentValues.GetValueOrDefault("subnetMask") != config.NewMask) ||
-                   (!string.IsNullOrEmpty(config.NewGateway) &&
-                    currentValues.GetValueOrDefault("ipAddress") != config.NewGateway); // This may need adjustment for nested gateway
+            return (currentValues.GetValueOrDefault("ipAddress") != camera.NewIP) ||
+                   (currentValues.GetValueOrDefault("subnetMask") != camera.NewMask) ||
+                   (!string.IsNullOrEmpty(camera.NewGateway) &&
+                    currentValues.GetValueOrDefault("ipAddress") != camera.NewGateway); // This may need adjustment for nested gateway
         }
 
-        private static bool HasNtpConfigChanged(Dictionary<string, string> currentValues, NetworkConfiguration config)
+        private static bool HasNtpConfigChanged(Dictionary<string, string> currentValues, Camera camera)
         {
-            return currentValues.GetValueOrDefault("ipAddress") != config.NewNTPServer;
+            return currentValues.GetValueOrDefault("ipAddress") != camera.NewNTPServer;
         }
 
         /// <summary>

@@ -5,6 +5,8 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
+using wpfhikip.Models;
+
 namespace wpfhikip.Protocols.Axis
 {
     public static class AxisJsonTemplates
@@ -113,37 +115,6 @@ namespace wpfhikip.Protocols.Axis
         }
 
         /// <summary>
-        /// Creates JSON for setting IPv4 address configuration
-        /// </summary>
-        public static string CreateSetIPv4ConfigJson(NetworkConfiguration config)
-        {
-            var prefixLength = CalculatePrefixLength(config.NewMask ?? "255.255.255.0");
-
-            var request = new
-            {
-                apiVersion = "1.0",
-                context = "NetworkConfig",
-                method = AxisUrl.JsonMethods.SetIPv4AddressConfiguration,
-                @params = new
-                {
-                    deviceName = "eth0",
-                    configurationMode = "static",
-                    staticDefaultRouter = config.NewGateway ?? "",
-                    staticAddressConfigurations = new[]
-                    {
-                        new
-                        {
-                            address = config.NewIP ?? "",
-                            prefixLength = prefixLength
-                        }
-                    }
-                }
-            };
-
-            return JsonSerializer.Serialize(request);
-        }
-
-        /// <summary>
         /// Creates JSON for getting IPv4 address configuration
         /// </summary>
         public static string CreateGetIPv4ConfigJson()
@@ -163,14 +134,45 @@ namespace wpfhikip.Protocols.Axis
         }
 
         /// <summary>
-        /// Compares current and new configurations to determine what needs updating
+        /// Creates JSON for setting IPv4 address configuration using Camera object
         /// </summary>
-        public static bool HasConfigurationChanged(Dictionary<string, object> currentConfig, NetworkConfiguration newConfig)
+        public static string CreateSetIPv4ConfigJson(Camera camera)
         {
-            return HasNetworkConfigChanged(currentConfig, newConfig);
+            var prefixLength = CalculatePrefixLength(camera.NewMask ?? "255.255.255.0");
+
+            var request = new
+            {
+                apiVersion = "1.0",
+                context = "SetIPv4Config",
+                method = AxisUrl.JsonMethods.SetIPv4AddressConfiguration,
+                @params = new
+                {
+                    deviceName = "eth0",
+                    configurationMode = "static",
+                    staticDefaultRouter = camera.NewGateway ?? "",
+                    staticAddressConfigurations = new[]
+                    {
+                        new
+                        {
+                            address = camera.NewIP ?? "",
+                            prefixLength = prefixLength
+                        }
+                    }
+                }
+            };
+
+            return JsonSerializer.Serialize(request);
         }
 
-        private static bool HasNetworkConfigChanged(Dictionary<string, object> currentConfig, NetworkConfiguration newConfig)
+        /// <summary>
+        /// Compares current and new configurations using Camera object
+        /// </summary>
+        public static bool HasConfigurationChanged(Dictionary<string, object> currentConfig, Camera camera)
+        {
+            return HasNetworkConfigChanged(currentConfig, camera);
+        }
+
+        private static bool HasNetworkConfigChanged(Dictionary<string, object> currentConfig, Camera camera)
         {
             // This would need to be implemented based on the actual response structure from Axis
             // For now, we'll return true to always attempt the update

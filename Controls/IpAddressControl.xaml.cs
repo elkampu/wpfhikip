@@ -27,6 +27,42 @@ namespace wpfhikip.Controls
         {
             InitializeComponent();
             SetupEventHandlers();
+
+            // Add focus handling for the entire control
+            this.GotFocus += IpAddressControl_GotFocus;
+            this.MouseLeftButtonDown += IpAddressControl_MouseLeftButtonDown;
+            this.Focusable = true; // Make the control itself focusable
+        }
+
+        /// <summary>
+        /// Focuses on the first octet and selects all text
+        /// </summary>
+        public void FocusFirstOctet()
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+            {
+                Octet1.Focus();
+                Octet1.SelectAll();
+            }));
+        }
+
+        private void IpAddressControl_GotFocus(object sender, RoutedEventArgs e)
+        {
+            // If no specific textbox has focus, focus the first one
+            if (!Octet1.IsFocused && !Octet2.IsFocused && !Octet3.IsFocused && !Octet4.IsFocused)
+            {
+                FocusFirstOctet();
+            }
+        }
+
+        private void IpAddressControl_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // If user clicks on the control but not on a specific textbox, focus the first one
+            if (!Octet1.IsFocused && !Octet2.IsFocused && !Octet3.IsFocused && !Octet4.IsFocused)
+            {
+                FocusFirstOctet();
+                e.Handled = true;
+            }
         }
 
         private static void OnIpAddressChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

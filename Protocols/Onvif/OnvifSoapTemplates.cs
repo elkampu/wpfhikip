@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
+using wpfhikip.Models;
+
 namespace wpfhikip.Protocols.Onvif
 {
     public static class OnvifSoapTemplates
@@ -182,27 +184,29 @@ namespace wpfhikip.Protocols.Onvif
             return CreateAuthenticatedSoapEnvelope(body, username, password, OnvifUrl.SoapActions.GetNetworkInterfaces);
         }
 
+        // Add these overloaded methods to OnvifSoapTemplates.cs after the existing methods:
+
         /// <summary>
-        /// Creates SetNetworkInterfaces SOAP request
+        /// Creates SetNetworkInterfaces SOAP request using Camera object
         /// </summary>
-        public static string CreateSetNetworkInterfacesRequest(NetworkConfiguration config, string interfaceToken, string username, string password)
+        public static string CreateSetNetworkInterfacesRequest(Camera camera, string interfaceToken, string username, string password)
         {
             var body = $@"<tds:SetNetworkInterfaces>
-                <tds:InterfaceToken>{interfaceToken}</tds:InterfaceToken>
-                <tds:NetworkInterface>
-                    <tt:Enabled>true</tt:Enabled>
-                    <tt:IPv4>
-                        <tt:Enabled>true</tt:Enabled>
-                        <tt:Config>
-                            <tt:Manual>
-                                <tt:Address>{config.NewIP}</tt:Address>
-                                <tt:PrefixLength>{CalculatePrefixLength(config.NewMask ?? "255.255.255.0")}</tt:PrefixLength>
-                            </tt:Manual>
-                            <tt:DHCP>false</tt:DHCP>
-                        </tt:Config>
-                    </tt:IPv4>
-                </tds:NetworkInterface>
-            </tds:SetNetworkInterfaces>";
+        <tds:InterfaceToken>{interfaceToken}</tds:InterfaceToken>
+        <tds:NetworkInterface>
+            <tt:Enabled>true</tt:Enabled>
+            <tt:IPv4>
+                <tt:Enabled>true</tt:Enabled>
+                <tt:Config>
+                    <tt:Manual>
+                        <tt:Address>{camera.NewIP}</tt:Address>
+                        <tt:PrefixLength>{CalculatePrefixLength(camera.NewMask ?? "255.255.255.0")}</tt:PrefixLength>
+                    </tt:Manual>
+                    <tt:DHCP>false</tt:DHCP>
+                </tt:Config>
+            </tt:IPv4>
+        </tds:NetworkInterface>
+    </tds:SetNetworkInterfaces>";
 
             return CreateAuthenticatedSoapEnvelope(body, username, password, OnvifUrl.SoapActions.SetNetworkInterfaces);
         }
@@ -217,21 +221,20 @@ namespace wpfhikip.Protocols.Onvif
         }
 
         /// <summary>
-        /// Creates SetNTP SOAP request
+        /// Creates SetNTP SOAP request using Camera object
         /// </summary>
-        public static string CreateSetNtpRequest(NetworkConfiguration config, string username, string password)
+        public static string CreateSetNtpRequest(Camera camera, string username, string password)
         {
             var body = $@"<tds:SetNTP>
-                <tds:FromDHCP>false</tds:FromDHCP>
-                <tds:NTPManual>
-                    <tt:Type>IPv4</tt:Type>
-                    <tt:IPv4Address>{config.NewNTPServer}</tt:IPv4Address>
-                </tds:NTPManual>
-            </tds:SetNTP>";
+        <tds:FromDHCP>false</tds:FromDHCP>
+        <tds:NTPManual>
+            <tt:Type>IPv4</tt:Type>
+            <tt:IPv4Address>{camera.NewNTPServer}</tt:IPv4Address>
+        </tds:NTPManual>
+    </tds:SetNTP>";
 
             return CreateAuthenticatedSoapEnvelope(body, username, password, OnvifUrl.SoapActions.SetNTP);
         }
-
         /// <summary>
         /// Creates WS-Discovery Probe request for ONVIF device discovery
         /// </summary>
@@ -355,33 +358,34 @@ namespace wpfhikip.Protocols.Onvif
             }
         }
 
+
         /// <summary>
-        /// Checks if configuration has changed by comparing current and new values
+        /// Checks if configuration has changed by comparing current and new values using Camera object
         /// </summary>
-        public static bool HasConfigurationChanged(Dictionary<string, string> currentConfig, NetworkConfiguration newConfig, string configType)
+        public static bool HasConfigurationChanged(Dictionary<string, string> currentConfig, Camera camera, string configType)
         {
             return configType.ToLower() switch
             {
-                "network" => HasNetworkConfigChanged(currentConfig, newConfig),
-                "ntp" => HasNtpConfigChanged(currentConfig, newConfig),
+                "network" => HasNetworkConfigChanged(currentConfig, camera),
+                "ntp" => HasNtpConfigChanged(currentConfig, camera),
                 _ => true // Default to updating if we can't determine
             };
         }
 
-        private static bool HasNetworkConfigChanged(Dictionary<string, string> currentConfig, NetworkConfiguration newConfig)
+        private static bool HasNetworkConfigChanged(Dictionary<string, string> currentConfig, Camera camera)
         {
             var currentIP = currentConfig.GetValueOrDefault("Address", "");
             var currentMask = currentConfig.GetValueOrDefault("PrefixLength", "");
 
-            return (!string.IsNullOrEmpty(newConfig.NewIP) && currentIP != newConfig.NewIP) ||
-                   (!string.IsNullOrEmpty(newConfig.NewMask) &&
-                    CalculatePrefixLength(newConfig.NewMask).ToString() != currentMask);
+            return (!string.IsNullOrEmpty(camera.NewIP) && currentIP != camera.NewIP) ||
+                   (!string.IsNullOrEmpty(camera.NewMask) &&
+                    CalculatePrefixLength(camera.NewMask).ToString() != currentMask);
         }
 
-        private static bool HasNtpConfigChanged(Dictionary<string, string> currentConfig, NetworkConfiguration newConfig)
+        private static bool HasNtpConfigChanged(Dictionary<string, string> currentConfig, Camera camera)
         {
             var currentNtpServer = currentConfig.GetValueOrDefault("IPv4Address", "");
-            return !string.IsNullOrEmpty(newConfig.NewNTPServer) && currentNtpServer != newConfig.NewNTPServer;
+            return !string.IsNullOrEmpty(camera.NewNTPServer) && currentNtpServer != camera.NewNTPServer;
         }
     }
 }

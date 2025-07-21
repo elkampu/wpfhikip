@@ -201,13 +201,14 @@ namespace wpfhikip.Protocols.Onvif
                 };
             }
         }
+        // Add these methods to OnvifConnection class:
 
         /// <summary>
-        /// Sends network configuration to the ONVIF device
+        /// Sends network configuration to the ONVIF device using Camera object
         /// </summary>
-        /// <param name="config">Network configuration to apply</param>
+        /// <param name="camera">Camera object containing configuration</param>
         /// <returns>Operation result</returns>
-        public async Task<OnvifOperationResult> SendNetworkConfigurationAsync(NetworkConfiguration config)
+        public async Task<OnvifOperationResult> SendNetworkConfigurationAsync(Camera camera)
         {
             try
             {
@@ -239,8 +240,8 @@ namespace wpfhikip.Protocols.Onvif
 
                 var interfaceToken = OnvifSoapTemplates.ExtractNetworkInterfaceToken(getResponse.Content);
 
-                // Now set the new network configuration
-                var setNetworkRequest = OnvifSoapTemplates.CreateSetNetworkInterfacesRequest(config, interfaceToken, Username, Password);
+                // Now set the new network configuration using Camera object
+                var setNetworkRequest = OnvifSoapTemplates.CreateSetNetworkInterfacesRequest(camera, interfaceToken, Username, Password);
                 var setResponse = await SendSoapRequestAsync(_deviceServiceUrl, setNetworkRequest);
 
                 if (setResponse.Success && !OnvifSoapTemplates.IsSoapFault(setResponse.Content))
@@ -273,11 +274,11 @@ namespace wpfhikip.Protocols.Onvif
         }
 
         /// <summary>
-        /// Sends NTP configuration to the ONVIF device
+        /// Sends NTP configuration to the ONVIF device using Camera object
         /// </summary>
-        /// <param name="config">Configuration containing NTP settings</param>
+        /// <param name="camera">Camera object containing NTP settings</param>
         /// <returns>Operation result</returns>
-        public async Task<OnvifOperationResult> SendNtpConfigurationAsync(NetworkConfiguration config)
+        public async Task<OnvifOperationResult> SendNtpConfigurationAsync(Camera camera)
         {
             try
             {
@@ -294,7 +295,7 @@ namespace wpfhikip.Protocols.Onvif
                     }
                 }
 
-                var setNtpRequest = OnvifSoapTemplates.CreateSetNtpRequest(config, Username, Password);
+                var setNtpRequest = OnvifSoapTemplates.CreateSetNtpRequest(camera, Username, Password);
                 var response = await SendSoapRequestAsync(_deviceServiceUrl, setNtpRequest);
 
                 if (response.Success && !OnvifSoapTemplates.IsSoapFault(response.Content))
@@ -325,7 +326,6 @@ namespace wpfhikip.Protocols.Onvif
                 };
             }
         }
-
         /// <summary>
         /// Synchronous version of CheckCompatibilityAsync for UI compatibility
         /// </summary>

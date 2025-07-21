@@ -215,46 +215,22 @@ namespace wpfhikip.Protocols.Dahua
             }
         }
 
+        // Add these methods to DahuaConnection class:
+
         /// <summary>
-        /// Sends network configuration to the Dahua device
+        /// Sends network configuration to the Dahua device using Camera object
         /// </summary>
-        /// <param name="config">Network configuration to apply</param>
+        /// <param name="camera">Camera object containing configuration</param>
         /// <returns>Operation result</returns>
-        public async Task<DahuaOperationResult> SendNetworkConfigurationAsync(NetworkConfiguration config)
+        public async Task<DahuaOperationResult> SendNetworkConfigurationAsync(Camera camera)
         {
             try
             {
                 InitializeHttpClientWithAuth();
 
-                // First, get current configuration to check if changes are needed
-                var currentConfigUrl = BuildUrl(DahuaUrl.NetworkEth0Config);
-                var currentConfigResponse = await _httpClient.GetAsync(currentConfigUrl);
-
-                if (currentConfigResponse.StatusCode != HttpStatusCode.OK)
-                {
-                    return new DahuaOperationResult
-                    {
-                        Success = false,
-                        Message = "Failed to retrieve current network configuration"
-                    };
-                }
-
-                var currentConfigContent = await currentConfigResponse.Content.ReadAsStringAsync();
-                var currentConfig = DahuaConfigTemplates.ParseConfigResponse(currentConfigContent);
-
-                // Check if configuration needs to be changed
-                if (!DahuaConfigTemplates.HasConfigurationChanged(currentConfig, config, "network"))
-                {
-                    return new DahuaOperationResult
-                    {
-                        Success = true,
-                        Message = "Network configuration is already up to date"
-                    };
-                }
-
                 // Build and send the network configuration URL
                 var setConfigUrl = DahuaUrl.UrlBuilders.BuildNetworkConfigUrl(
-                    IpAddress, config.NewIP, config.NewMask, config.NewGateway);
+                    IpAddress, camera.NewIP, camera.NewMask, camera.NewGateway);
 
                 var setConfigResponse = await _httpClient.GetAsync(setConfigUrl);
 
@@ -286,18 +262,18 @@ namespace wpfhikip.Protocols.Dahua
         }
 
         /// <summary>
-        /// Sends NTP configuration to the Dahua device
+        /// Sends NTP configuration to the Dahua device using Camera object
         /// </summary>
-        /// <param name="config">Configuration containing NTP settings</param>
+        /// <param name="camera">Camera object containing NTP settings</param>
         /// <returns>Operation result</returns>
-        public async Task<DahuaOperationResult> SendNtpConfigurationAsync(NetworkConfiguration config)
+        public async Task<DahuaOperationResult> SendNtpConfigurationAsync(Camera camera)
         {
             try
             {
                 InitializeHttpClientWithAuth();
 
                 // Send NTP configuration
-                var ntpConfigUrl = DahuaUrl.UrlBuilders.BuildNtpConfigUrl(IpAddress, config.NewNTPServer);
+                var ntpConfigUrl = DahuaUrl.UrlBuilders.BuildNtpConfigUrl(IpAddress, camera.NewNTPServer);
                 var ntpResponse = await _httpClient.GetAsync(ntpConfigUrl);
 
                 if (ntpResponse.StatusCode != HttpStatusCode.OK)

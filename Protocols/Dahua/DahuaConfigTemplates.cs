@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using wpfhikip.Models;
+
 namespace wpfhikip.Protocols.Dahua
 {
     public static class DahuaConfigTemplates
@@ -67,28 +69,28 @@ namespace wpfhikip.Protocols.Dahua
         }
 
         /// <summary>
-        /// Creates URL parameters for network configuration
+        /// Creates URL parameters for network configuration using Camera object
         /// </summary>
-        public static Dictionary<string, string> CreateNetworkConfigParameters(NetworkConfiguration config)
+        public static Dictionary<string, string> CreateNetworkConfigParameters(Camera camera)
         {
             var parameters = new Dictionary<string, string>();
 
-            if (!string.IsNullOrEmpty(config.NewIP))
-                parameters["Network.eth0.IPAddress"] = config.NewIP;
+            if (!string.IsNullOrEmpty(camera.NewIP))
+                parameters["Network.eth0.IPAddress"] = camera.NewIP;
 
-            if (!string.IsNullOrEmpty(config.NewMask))
-                parameters["Network.eth0.SubnetMask"] = config.NewMask;
+            if (!string.IsNullOrEmpty(camera.NewMask))
+                parameters["Network.eth0.SubnetMask"] = camera.NewMask;
 
-            if (!string.IsNullOrEmpty(config.NewGateway))
-                parameters["Network.eth0.DefaultGateway"] = config.NewGateway;
+            if (!string.IsNullOrEmpty(camera.NewGateway))
+                parameters["Network.eth0.DefaultGateway"] = camera.NewGateway;
 
             return parameters;
         }
 
         /// <summary>
-        /// Creates URL parameters for NTP configuration
+        /// Creates URL parameters for NTP configuration using Camera object
         /// </summary>
-        public static Dictionary<string, string> CreateNtpConfigParameters(NetworkConfiguration config, bool enableNtp = true, int timeZone = 1)
+        public static Dictionary<string, string> CreateNtpConfigParameters(Camera camera, bool enableNtp = true, int timeZone = 1)
         {
             var parameters = new Dictionary<string, string>();
 
@@ -97,8 +99,8 @@ namespace wpfhikip.Protocols.Dahua
 
             parameters["NTP.TimeZone"] = timeZone.ToString();
 
-            if (!string.IsNullOrEmpty(config.NewNTPServer))
-                parameters["NTP.Address"] = config.NewNTPServer;
+            if (!string.IsNullOrEmpty(camera.NewNTPServer))
+                parameters["NTP.Address"] = camera.NewNTPServer;
 
             return parameters;
         }
@@ -125,33 +127,33 @@ namespace wpfhikip.Protocols.Dahua
         }
 
         /// <summary>
-        /// Compares current and new configurations to determine what needs updating
+        /// Compares current and new configurations to determine what needs updating using Camera object
         /// </summary>
-        public static bool HasConfigurationChanged(Dictionary<string, string> currentConfig, NetworkConfiguration newConfig, string configType)
+        public static bool HasConfigurationChanged(Dictionary<string, string> currentConfig, Camera camera, string configType)
         {
             return configType.ToLower() switch
             {
-                "network" => HasNetworkConfigChanged(currentConfig, newConfig),
-                "ntp" => HasNtpConfigChanged(currentConfig, newConfig),
+                "network" => HasNetworkConfigChanged(currentConfig, camera),
+                "ntp" => HasNtpConfigChanged(currentConfig, camera),
                 _ => true // Default to updating if we can't determine
             };
         }
 
-        private static bool HasNetworkConfigChanged(Dictionary<string, string> currentConfig, NetworkConfiguration newConfig)
+        private static bool HasNetworkConfigChanged(Dictionary<string, string> currentConfig, Camera camera)
         {
             var currentIP = currentConfig.GetValueOrDefault("table.Network.eth0.IPAddress", "");
             var currentMask = currentConfig.GetValueOrDefault("table.Network.eth0.SubnetMask", "");
             var currentGateway = currentConfig.GetValueOrDefault("table.Network.eth0.DefaultGateway", "");
 
-            return (!string.IsNullOrEmpty(newConfig.NewIP) && currentIP != newConfig.NewIP) ||
-                   (!string.IsNullOrEmpty(newConfig.NewMask) && currentMask != newConfig.NewMask) ||
-                   (!string.IsNullOrEmpty(newConfig.NewGateway) && currentGateway != newConfig.NewGateway);
+            return (!string.IsNullOrEmpty(camera.NewIP) && currentIP != camera.NewIP) ||
+                   (!string.IsNullOrEmpty(camera.NewMask) && currentMask != camera.NewMask) ||
+                   (!string.IsNullOrEmpty(camera.NewGateway) && currentGateway != camera.NewGateway);
         }
 
-        private static bool HasNtpConfigChanged(Dictionary<string, string> currentConfig, NetworkConfiguration newConfig)
+        private static bool HasNtpConfigChanged(Dictionary<string, string> currentConfig, Camera camera)
         {
             var currentNtpServer = currentConfig.GetValueOrDefault("table.NTP.Address", "");
-            return !string.IsNullOrEmpty(newConfig.NewNTPServer) && currentNtpServer != newConfig.NewNTPServer;
+            return !string.IsNullOrEmpty(camera.NewNTPServer) && currentNtpServer != camera.NewNTPServer;
         }
 
         /// <summary>

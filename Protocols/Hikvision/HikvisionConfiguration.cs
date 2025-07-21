@@ -6,6 +6,8 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
+using wpfhikip.Models;
+
 namespace wpfhikip.Protocols.Hikvision
 {
     class HikvisionConfiguration
@@ -91,9 +93,9 @@ namespace wpfhikip.Protocols.Hikvision
         }
 
         /// <summary>
-        /// Performs the full GET-modify-PUT workflow
+        /// Performs the full GET-modify-PUT workflow using Camera object
         /// </summary>
-        public async Task<(bool Success, string ErrorMessage)> UpdateConfigurationAsync(string endpoint, NetworkConfiguration config)
+        public async Task<(bool Success, string ErrorMessage)> UpdateConfigurationAsync(string endpoint, Camera camera)
         {
             // Step 1: Get current configuration
             var (getSuccess, currentXml, getError) = await GetConfigurationAsync(endpoint);
@@ -103,7 +105,7 @@ namespace wpfhikip.Protocols.Hikvision
             }
 
             // Step 2: Check if configuration actually needs updating
-            if (!HikvisionXmlTemplates.HasConfigurationChanged(currentXml, config, endpoint))
+            if (!HikvisionXmlTemplates.HasConfigurationChanged(currentXml, camera, endpoint))
             {
                 return (true, "Configuration is already up to date");
             }
@@ -111,7 +113,7 @@ namespace wpfhikip.Protocols.Hikvision
             // Step 3: Modify XML with new values
             try
             {
-                var modifiedXml = HikvisionXmlTemplates.CreatePutXmlFromGetResponse(currentXml, config, endpoint);
+                var modifiedXml = HikvisionXmlTemplates.CreatePutXmlFromGetResponse(currentXml, camera, endpoint);
 
                 // Step 4: Validate modified XML
                 if (!HikvisionXmlTemplates.ValidateXml(modifiedXml))

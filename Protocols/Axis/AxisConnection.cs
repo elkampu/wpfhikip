@@ -216,19 +216,21 @@ namespace wpfhikip.Protocols.Axis
             }
         }
 
+        // Add this method to AxisConnection class:
+
         /// <summary>
-        /// Sends network configuration to the Axis device
+        /// Sends network configuration to the Axis device using Camera object
         /// </summary>
-        /// <param name="config">Network configuration to apply</param>
+        /// <param name="camera">Camera object containing configuration</param>
         /// <returns>Operation result</returns>
-        public async Task<AxisOperationResult> SendNetworkConfigurationAsync(NetworkConfiguration config)
+        public async Task<AxisOperationResult> SendNetworkConfigurationAsync(Camera camera)
         {
             try
             {
                 InitializeHttpClientWithAuth();
 
                 // Create the JSON request for setting IPv4 configuration
-                var jsonRequest = AxisJsonTemplates.CreateSetIPv4ConfigJson(config);
+                var jsonRequest = AxisJsonTemplates.CreateSetIPv4ConfigJson(camera);
                 var content = new StringContent(jsonRequest, Encoding.UTF8, AxisContentTypes.Json);
 
                 var networkSettingsUrl = BuildUrl(AxisUrl.NetworkSettings);

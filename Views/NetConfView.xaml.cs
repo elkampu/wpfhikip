@@ -12,13 +12,13 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 
-using wpfhikip.Controls;
+using wpfhikip.Models;
 using wpfhikip.Views.Dialogs;
 
 namespace wpfhikip.Views
 {
     /// <summary>
-    /// Lógica de interacción para NetConfView.xaml
+    /// Interaction logic for NetConfView.xaml
     /// </summary>
     public partial class NetConfView : Window
     {
@@ -27,6 +27,7 @@ namespace wpfhikip.Views
             InitializeComponent();
         }
 
+        // COPY & PASTE
         private void DataGrid_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             // COPY
@@ -41,11 +42,6 @@ namespace wpfhikip.Views
                         Clipboard.SetText(textBlock.Text);
                         e.Handled = true;
                     }
-                    else if (content is IpAddressControl ipControl)
-                    {
-                        Clipboard.SetText(ipControl.IpAddress ?? string.Empty);
-                        e.Handled = true;
-                    }
                 }
             }
             // PASTE
@@ -55,19 +51,6 @@ namespace wpfhikip.Views
                 e.Handled = true;
             }
         }
-        private void StatusTextBlock_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            // Get the TextBlock that was clicked
-            if (sender is TextBlock textBlock && textBlock.Tag is NetworkConfiguration config)
-            {
-                // Open the status detail dialog
-                var statusDialog = new StatusDetailDialog(config)
-                {
-                    Owner = this
-                };
-                statusDialog.ShowDialog();
-            }
-        }
 
         private void PasteToSelectedCell()
         {
@@ -75,61 +58,24 @@ namespace wpfhikip.Views
             {
                 var clipboardText = Clipboard.GetText();
                 var column = dataGrid.CurrentCell.Column;
-                var row = (NetworkConfiguration)dataGrid.CurrentItem;
-
-                // Handle template columns with IP controls
-                if (column is DataGridTemplateColumn templateColumn)
+                var row = (Camera)dataGrid.CurrentItem;
+                var property = typeof(Camera).GetProperty(column.SortMemberPath);
+                if (property != null && property.CanWrite)
                 {
-                    var headerText = templateColumn.Header?.ToString();
-                    switch (headerText)
-                    {
-                        case "Current IP":
-                            if (IsValidIpAddress(clipboardText))
-                                row.CurrentIP = clipboardText;
-                            break;
-                        case "New IP":
-                            if (IsValidIpAddress(clipboardText))
-                                row.NewIP = clipboardText;
-                            break;
-                        case "New Mask":
-                            if (IsValidIpAddress(clipboardText))
-                                row.NewMask = clipboardText;
-                            break;
-                        case "New Gateway":
-                            if (IsValidIpAddress(clipboardText))
-                                row.NewGateway = clipboardText;
-                            break;
-                        case "New NTP Server":
-                            if (IsValidIpAddress(clipboardText))
-                                row.NewNTPServer = clipboardText;
-                            break;
-                    }
-                }
-                // Handle regular text columns
-                else if (column is DataGridTextColumn textColumn)
-                {
-                    var property = typeof(NetworkConfiguration).GetProperty(textColumn.SortMemberPath);
-                    if (property != null && property.CanWrite)
-                    {
-                        property.SetValue(row, clipboardText);
-                    }
+                    property.SetValue(row, clipboardText);
                 }
             }
         }
 
-        private bool IsValidIpAddress(string ip)
+        private void StatusTextBlock_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (string.IsNullOrEmpty(ip)) return true; // Allow empty values
-
-            var parts = ip.Split('.');
-            if (parts.Length != 4) return false;
-
-            foreach (var part in parts)
+            if (sender is TextBlock textBlock && textBlock.Tag is Camera camera)
             {
-                if (!int.TryParse(part, out int value) || value < 0 || value > 255)
-                    return false;
+                // Create and show the status detail dialog
+                var statusDialog = new StatusDetailDialog(camera);
+                statusDialog.Owner = this;
+                statusDialog.ShowDialog();
             }
-            return true;
         }
     }
 }

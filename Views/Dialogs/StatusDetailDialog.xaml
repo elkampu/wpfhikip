@@ -4,14 +4,14 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Detailed Status Logs"
+        Title="Protocol Status Monitor"
         Height="500"
-        Width="700"
+        Width="600"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="#FF2D2D30"
         MinHeight="400"
-        MinWidth="600">
+        MinWidth="500">
     <Window.Resources>
         <Style x:Key="ModernTextBlockStyle"
                TargetType="TextBlock">
@@ -32,15 +32,35 @@
                     Value="Bold" />
         </Style>
 
-        <Style x:Key="LogTextBlockStyle"
+        <Style x:Key="LabelTextBlockStyle"
                TargetType="TextBlock"
                BasedOn="{StaticResource ModernTextBlockStyle}">
+            <Setter Property="FontWeight"
+                    Value="Bold" />
+            <Setter Property="FontSize"
+                    Value="13" />
+        </Style>
+
+        <Style x:Key="ValueTextBlockStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource ModernTextBlockStyle}">
+            <Setter Property="FontSize"
+                    Value="13" />
             <Setter Property="FontFamily"
                     Value="Consolas" />
+        </Style>
+
+        <Style x:Key="StatusTextBlockStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource ModernTextBlockStyle}">
             <Setter Property="FontSize"
                     Value="11" />
+            <Setter Property="FontFamily"
+                    Value="Consolas" />
             <Setter Property="LineHeight"
                     Value="16" />
+            <Setter Property="TextWrapping"
+                    Value="Wrap" />
         </Style>
 
         <Style x:Key="CloseButtonStyle"
@@ -85,42 +105,64 @@
             </Setter>
         </Style>
 
-        <Style x:Key="RefreshButtonStyle"
+        <Style x:Key="CopyButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource CloseButtonStyle}">
             <Setter Property="Background"
-                    Value="#FF28A745" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                CornerRadius="4"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                BorderBrush="{TemplateBinding BorderBrush}">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver"
-                                     Value="True">
-                                <Setter Property="Background"
-                                        Value="#FF218838" />
-                            </Trigger>
-                            <Trigger Property="IsPressed"
-                                     Value="True">
-                                <Setter Property="Background"
-                                        Value="#FF1E7E34" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+                    Value="#FF6C6C6C" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver"
+                         Value="True">
+                    <Setter Property="Background"
+                            Value="#FF808080" />
+                </Trigger>
+                <Trigger Property="IsPressed"
+                         Value="True">
+                    <Setter Property="Background"
+                            Value="#FF4A4A4A" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Protocol Status Styles -->
+        <Style x:Key="ProtocolCardStyle"
+               TargetType="Border">
+            <Setter Property="Background"
+                    Value="#FF383838" />
+            <Setter Property="CornerRadius"
+                    Value="6" />
+            <Setter Property="Padding"
+                    Value="12" />
+            <Setter Property="Margin"
+                    Value="5" />
+            <Setter Property="BorderThickness"
+                    Value="2" />
+            <Setter Property="BorderBrush"
+                    Value="#FF505050" />
+        </Style>
+
+        <Style x:Key="ProtocolNameStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource ModernTextBlockStyle}">
+            <Setter Property="FontWeight"
+                    Value="Bold" />
+            <Setter Property="FontSize"
+                    Value="14" />
+        </Style>
+
+        <Style x:Key="ProtocolStatusStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource ModernTextBlockStyle}">
+            <Setter Property="FontSize"
+                    Value="10" />
+            <Setter Property="FontStyle"
+                    Value="Italic" />
         </Style>
     </Window.Resources>
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -129,64 +171,95 @@
 
         <!-- Header Section -->
         <TextBlock Grid.Row="0"
-                   Text="Camera Status &amp; Activity Logs"
+                   Text="Protocol Status Monitor"
                    Style="{StaticResource HeaderTextBlockStyle}"
-                   Margin="0,0,0,15" />
+                   Margin="0,0,0,20" />
 
-        <!-- Camera Information Section -->
-        <Grid Grid.Row="1"
-              Margin="0,0,0,15">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+        <!-- Connection Information Section -->
+        <Border Grid.Row="1"
+                Background="#FF383838"
+                CornerRadius="6"
+                Padding="15"
+                Margin="0,0,0,15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0"
-                       Grid.Column="0"
-                       Text="IP Address: "
-                       Style="{StaticResource ModernTextBlockStyle}"
-                       FontWeight="Bold"
-                       Margin="0,0,10,5" />
-            <TextBlock Grid.Row="0"
-                       Grid.Column="1"
-                       x:Name="IpAddressTextBlock"
-                       Style="{StaticResource ModernTextBlockStyle}"
-                       Margin="0,0,20,5" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="0"
+                           Text="IP Address:"
+                           Style="{StaticResource LabelTextBlockStyle}"
+                           Margin="0,0,15,8" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="1"
+                           x:Name="IpAddressTextBlock"
+                           Style="{StaticResource ValueTextBlockStyle}"
+                           Margin="0,0,0,8" />
 
-            <TextBlock Grid.Row="0"
-                       Grid.Column="2"
-                       Text="Model: "
-                       Style="{StaticResource ModernTextBlockStyle}"
-                       FontWeight="Bold"
-                       Margin="0,0,10,5" />
-            <TextBlock Grid.Row="0"
-                       Grid.Column="3"
-                       x:Name="ModelTextBlock"
-                       Style="{StaticResource ModernTextBlockStyle}"
-                       Margin="0,0,0,5" />
+                <TextBlock Grid.Row="1"
+                           Grid.Column="0"
+                           Text="Port:"
+                           Style="{StaticResource LabelTextBlockStyle}"
+                           Margin="0,0,15,8" />
+                <TextBlock Grid.Row="1"
+                           Grid.Column="1"
+                           x:Name="PortTextBlock"
+                           Style="{StaticResource ValueTextBlockStyle}"
+                           Margin="0,0,0,8" />
 
-            <TextBlock Grid.Row="1"
-                       Grid.Column="0"
-                       Text="Current Status: "
-                       Style="{StaticResource ModernTextBlockStyle}"
-                       FontWeight="Bold"
-                       Margin="0,0,10,0" />
-            <TextBlock Grid.Row="1"
-                       Grid.Column="1"
-                       Grid.ColumnSpan="3"
-                       x:Name="CurrentStatusTextBlock"
-                       Style="{StaticResource ModernTextBlockStyle}"
-                       TextWrapping="Wrap" />
-        </Grid>
+                <TextBlock Grid.Row="2"
+                           Grid.Column="0"
+                           Text="Live Status:"
+                           Style="{StaticResource LabelTextBlockStyle}"
+                           Margin="0,0,15,0"
+                           VerticalAlignment="Top" />
+                <TextBlock Grid.Row="2"
+                           Grid.Column="1"
+                           x:Name="LiveStatusTextBlock"
+                           Style="{StaticResource ValueTextBlockStyle}"
+                           TextWrapping="Wrap" />
+            </Grid>
+        </Border>
 
-        <!-- Logs Section -->
+        <!-- Dynamic Protocol Status Section -->
         <Border Grid.Row="2"
+                Background="#FF1E1E1E"
+                BorderBrush="#FF404040"
+                BorderThickness="1"
+                CornerRadius="4"
+                Margin="0,0,0,15">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0"
+                        Background="#FF383838"
+                        CornerRadius="4,4,0,0"
+                        Padding="10,8">
+                    <TextBlock Text="Protocol Testing Status"
+                               Style="{StaticResource ModernTextBlockStyle}"
+                               FontWeight="Bold"
+                               FontSize="13" />
+                </Border>
+
+                <UniformGrid Grid.Row="1"
+                             x:Name="ProtocolStatusGrid"
+                             Columns="2"
+                             Margin="10" />
+            </Grid>
+        </Border>
+
+        <!-- Live Status Activity Section -->
+        <Border Grid.Row="3"
                 Background="#FF1E1E1E"
                 BorderBrush="#FF404040"
                 BorderThickness="1"
@@ -209,55 +282,59 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Column="0"
-                                   Text="Activity Logs"
+                                   Text="Live Protocol Activity"
                                    Style="{StaticResource ModernTextBlockStyle}"
                                    FontWeight="Bold"
                                    FontSize="13" />
 
                         <Button Grid.Column="1"
-                                Content="Refresh Logs"
-                                Width="100"
-                                Height="24"
-                                Style="{StaticResource RefreshButtonStyle}"
-                                Click="RefreshButton_Click" />
+                                Content="Copy Logs"
+                                Width="80"
+                                Height="26"
+                                Style="{StaticResource CopyButtonStyle}"
+                                Click="CopyLogsButton_Click"
+                                ToolTip="Copy all logs to clipboard" />
                     </Grid>
                 </Border>
 
                 <ScrollViewer Grid.Row="1"
-                              x:Name="LogScrollViewer"
+                              x:Name="StatusScrollViewer"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Auto"
                               Padding="10">
-                    <TextBlock x:Name="LogsTextBlock"
-                               Style="{StaticResource LogTextBlockStyle}"
-                               TextWrapping="Wrap"
-                               Text="Loading detailed logs..." />
+                    <TextBox x:Name="StatusActivityTextBox"
+                             Style="{x:Null}"
+                             Background="Transparent"
+                             Foreground="White"
+                             FontFamily="Consolas"
+                             FontSize="11"
+                             TextWrapping="Wrap"
+                             BorderThickness="0"
+                             IsReadOnly="True"
+                             VerticalScrollBarVisibility="Disabled"
+                             HorizontalScrollBarVisibility="Disabled"
+                             Text="Monitoring protocol activity..." />
                 </ScrollViewer>
             </Grid>
         </Border>
 
         <!-- Button Section -->
-        <Grid Grid.Row="3">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <Button Grid.Column="0"
-                    Content="Copy Logs"
-                    Width="90"
+        <StackPanel Grid.Row="4"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Copy All Logs"
+                    Width="100"
                     Height="32"
-                    Style="{StaticResource RefreshButtonStyle}"
-                    Click="CopyLogsButton_Click" />
+                    Margin="0,0,10,0"
+                    Style="{StaticResource CopyButtonStyle}"
+                    Click="CopyAllLogsButton_Click"
+                    ToolTip="Copy all logs to clipboard" />
 
-            <Button Grid.Column="2"
-                    Content="Close"
+            <Button Content="Close"
                     Width="80"
                     Height="32"
-                    HorizontalAlignment="Right"
                     Style="{StaticResource CloseButtonStyle}"
                     Click="CloseButton_Click" />
-        </Grid>
+        </StackPanel>
     </Grid>
 </Window>

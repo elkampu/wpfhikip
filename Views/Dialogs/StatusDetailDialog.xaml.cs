@@ -2,16 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+
+using wpfhikip.Models;
+
+// Add this alias to avoid namespace conflicts
+using ModelsProtocolLogEntry = wpfhikip.Models.ProtocolLogEntry;
 
 namespace wpfhikip.Views.Dialogs
 {
@@ -20,209 +20,519 @@ namespace wpfhikip.Views.Dialogs
     /// </summary>
     public partial class StatusDetailDialog : Window
     {
-        private readonly NetworkConfiguration _config;
+        private readonly Camera _camera;
         private readonly DispatcherTimer _refreshTimer;
-        private readonly StringBuilder _logBuilder;
-        private bool _autoScrollToBottom = true; // Track if we should auto-scroll to bottom
+        private readonly StringBuilder _activityLog;
+        private bool _autoScrollToBottom = true;
+        private int _lastLogCount = 0;
+        private Dictionary<string, ProtocolStatusCard> _protocolCards = new();
 
-        public StatusDetailDialog(NetworkConfiguration config)
+        public StatusDetailDialog(Camera camera)
         {
             InitializeComponent();
-            _config = config;
-            _logBuilder = new StringBuilder();
+            _camera = camera;
+            _activityLog = new StringBuilder();
 
-            // Set the camera information
-            IpAddressTextBlock.Text = config.CurrentIP ?? "N/A";
-            ModelTextBlock.Text = config.Model ?? "Unknown";
-            CurrentStatusTextBlock.Text = config.Status ?? "No status information available";
+            // Set the connection information
+            IpAddressTextBlock.Text = camera.CurrentIP ?? "N/A";
+            PortTextBlock.Text = GetPortDisplay(camera);
+            LiveStatusTextBlock.Text = camera.Status ?? "No status information";
 
             // Set window title with IP address
-            Title = $"Status Details - {config.CurrentIP ?? "Unknown IP"}";
+            Title = $"Protocol Status - {camera.CurrentIP ?? "Unknown IP"}";
 
-            // Initialize auto-refresh timer
+            // Initialize protocol status cards
+            InitializeProtocolStatusCards();
+
+            // Initialize auto-refresh timer for live updates
             _refreshTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromSeconds(2)
+                Interval = TimeSpan.FromMilliseconds(250) // Update 4 times per second for real-time feel
             };
             _refreshTimer.Tick += RefreshTimer_Tick;
 
-            // Monitor scroll position to determine auto-scroll behavior
-            LogScrollViewer.ScrollChanged += LogScrollViewer_ScrollChanged;
+            // Monitor scroll position for auto-scroll behavior
+            StatusScrollViewer.ScrollChanged += (s, e) =>
+            {
+                const double tolerance = 10.0;
+                _autoScrollToBottom = Math.Abs(e.VerticalOffset - (e.ExtentHeight - e.ViewportHeight)) < tolerance;
+            };
 
-            // Load initial logs
-            LoadDetailedLogs(scrollToBottom: true);
+            // Initialize activity log
+            UpdateActivityLog();
 
-            // Start auto-refresh
+            // Start live monitoring
             _refreshTimer.Start();
         }
 
-        private void LogScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        private void InitializeProtocolStatusCards()
         {
-            // Check if user scrolled manually (not at the bottom)
-            // If the user is near the bottom (within 10 pixels), keep auto-scrolling
-            const double tolerance = 10.0;
-            _autoScrollToBottom = Math.Abs(e.VerticalOffset - (e.ExtentHeight - e.ViewportHeight)) < tolerance;
+            var protocols = new[] { "Hikvision", "Dahua", "Axis", "ONVIF" };
+
+            foreach (var protocol in protocols)
+            {
+                var card = new ProtocolStatusCard(protocol);
+                _protocolCards[protocol] = card;
+                ProtocolStatusGrid.Children.Add(card);
+            }
+        }
+
+        private string GetPortDisplay(Camera camera)
+        {
+            var effectivePort = camera.EffectivePort;
+            var customPort = camera.Port;
+
+            if (!string.IsNullOrEmpty(customPort) && int.TryParse(customPort, out _))
+            {
+                return $"{effectivePort} (Custom)";
+            }
+            else
+            {
+                var protocolDisplay = camera.Protocol == CameraProtocol.Auto ? "Auto" : camera.Protocol.ToString();
+                return $"{effectivePort} ({protocolDisplay})";
+            }
         }
 
         private void RefreshTimer_Tick(object sender, EventArgs e)
         {
-            // Update current status
-            CurrentStatusTextBlock.Text = _config.Status ?? "No status information available";
+            // Update live status
+            LiveStatusTextBlock.Text = _camera.Status ?? "No status information";
 
-            // Refresh logs while preserving scroll position
-            LoadDetailedLogs(scrollToBottom: false, preservePosition: true);
+            // Update port if it changed
+            PortTextBlock.Text = GetPortDisplay(_camera);
+
+            // Update protocol status cards
+            UpdateProtocolStatusCards();
+
+            // Update activity log if new entries are available
+            if (_camera.ProtocolLogs.Count != _lastLogCount)
+            {
+                UpdateActivityLog();
+                _lastLogCount = _camera.ProtocolLogs.Count;
+            }
         }
 
-        private void LoadDetailedLogs(bool scrollToBottom = false, bool preservePosition = false)
+        private void UpdateProtocolStatusCards()
         {
-            // Save current scroll position if we need to preserve it
-            double savedVerticalOffset = 0;
-            double savedHorizontalOffset = 0;
+            var logs = _camera.ProtocolLogs.ToArray();
+            var currentStatus = _camera.Status ?? "";
 
-            if (preservePosition)
+            // Reset all cards to default state
+            foreach (var card in _protocolCards.Values)
             {
-                savedVerticalOffset = LogScrollViewer.VerticalOffset;
-                savedHorizontalOffset = LogScrollViewer.HorizontalOffset;
+                card.SetStatus(ProtocolTestStatus.Pending, "Waiting...");
             }
 
-            var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
-
-            // Build comprehensive log information
-            var logs = new StringBuilder();
-
-            logs.AppendLine("=== CAMERA CONFIGURATION DETAILS ===");
-            logs.AppendLine($"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            logs.AppendLine($"IP Address: {_config.CurrentIP ?? "Not set"}");
-            logs.AppendLine($"Model: {_config.Model ?? "Not detected"}");
-            logs.AppendLine($"Current Status: {_config.Status ?? "No status"}");
-            logs.AppendLine($"Online Status: {_config.OnlineStatus ?? "Unknown"}");
-            logs.AppendLine();
-
-            logs.AppendLine("=== NETWORK CONFIGURATION ===");
-            logs.AppendLine($"Current IP: {_config.CurrentIP ?? "Not set"}");
-            logs.AppendLine($"New IP: {_config.NewIP ?? "Not configured"}");
-            logs.AppendLine($"Subnet Mask: {_config.NewMask ?? "Not configured"}");
-            logs.AppendLine($"Gateway: {_config.NewGateway ?? "Not configured"}");
-            logs.AppendLine($"NTP Server: {_config.NewNTPServer ?? "Not configured"}");
-            logs.AppendLine($"Username: {_config.User ?? "Not set"}");
-            logs.AppendLine($"Password: {(!string.IsNullOrEmpty(_config.Password) ? "***" : "Not set")}");
-            logs.AppendLine();
-
-            logs.AppendLine("=== ACTIVITY LOG ===");
-            logs.AppendLine($"[{timestamp}] Status: {_config.Status ?? "No status"}");
-
-            // Add simulated detailed logs based on the current status
-            if (!string.IsNullOrEmpty(_config.Status))
+            // Update based on current activity
+            if (currentStatus.Contains("Testing") && currentStatus.Contains("protocol"))
             {
-                if (_config.Status.Contains("Checking connectivity"))
+                var testingProtocol = ExtractProtocolFromStatus(currentStatus);
+                if (_protocolCards.ContainsKey(testingProtocol))
                 {
-                    logs.AppendLine($"[{timestamp}] → Initiating connection test to {_config.CurrentIP}");
-                    logs.AppendLine($"[{timestamp}] → Sending ICMP ping request...");
-                    logs.AppendLine($"[{timestamp}] → Timeout: 3000ms");
-                }
-                else if (_config.Status.Contains("Ping successful"))
-                {
-                    logs.AppendLine($"[{timestamp}] ✓ PING: Host {_config.CurrentIP} is reachable");
-                    logs.AppendLine($"[{timestamp}] → Response time: ~15ms");
-                    logs.AppendLine($"[{timestamp}] → Testing protocol compatibility...");
-                }
-                else if (_config.Status.Contains("compatible"))
-                {
-                    logs.AppendLine($"[{timestamp}] ✓ PROTOCOL: {_config.Model} compatibility confirmed");
-                    logs.AppendLine($"[{timestamp}] → API endpoints responding correctly");
-                    logs.AppendLine($"[{timestamp}] → Authentication status verified");
-                }
-                else if (_config.Status.Contains("Sending"))
-                {
-                    logs.AppendLine($"[{timestamp}] → Preparing configuration payload...");
-                    logs.AppendLine($"[{timestamp}] → Establishing HTTP connection to {_config.CurrentIP}");
-                    logs.AppendLine($"[{timestamp}] → Sending configuration request...");
-                }
-                else if (_config.Status.Contains("successfully"))
-                {
-                    logs.AppendLine($"[{timestamp}] ✓ SUCCESS: Configuration applied successfully");
-                    logs.AppendLine($"[{timestamp}] → HTTP Response: 200 OK");
-                    logs.AppendLine($"[{timestamp}] → Configuration saved to device");
-                }
-                else if (_config.Status.Contains("failed") || _config.Status.Contains("Error"))
-                {
-                    logs.AppendLine($"[{timestamp}] ✗ ERROR: Operation failed");
-                    logs.AppendLine($"[{timestamp}] → Check network connectivity");
-                    logs.AppendLine($"[{timestamp}] → Verify credentials");
-                    logs.AppendLine($"[{timestamp}] → Confirm device compatibility");
-                }
-                else if (_config.Status.Contains("Login failed"))
-                {
-                    logs.AppendLine($"[{timestamp}] ✗ AUTH ERROR: Invalid credentials");
-                    logs.AppendLine($"[{timestamp}] → HTTP Response: 401 Unauthorized");
-                    logs.AppendLine($"[{timestamp}] → Please verify username and password");
-                }
-                else if (_config.Status.Contains("not reachable"))
-                {
-                    logs.AppendLine($"[{timestamp}] ✗ NETWORK ERROR: Host unreachable");
-                    logs.AppendLine($"[{timestamp}] → PING timeout after 3000ms");
-                    logs.AppendLine($"[{timestamp}] → Check IP address and network connectivity");
+                    _protocolCards[testingProtocol].SetStatus(ProtocolTestStatus.Testing, "Testing...");
                 }
             }
 
-            logs.AppendLine();
-            logs.AppendLine("=== TECHNICAL DETAILS ===");
-            logs.AppendLine($"Protocol Stack: HTTP/HTTPS over TCP/IP");
-            logs.AppendLine($"Authentication: Digest/Basic Auth");
-            logs.AppendLine($"User Agent: NetworkConfigTool v1.0");
-            logs.AppendLine($"Connection Timeout: 5000ms");
-            logs.AppendLine($"Read Timeout: 10000ms");
-            logs.AppendLine();
+            // Update based on logs - this is the main logic that determines compatibility
+            var protocolGroups = logs
+                .Where(l => ShouldIncludeLogEntry(l))
+                .GroupBy(l => NormalizeProtocolName(l.Protocol));
 
-            logs.AppendLine("=== DEBUG INFORMATION ===");
-            logs.AppendLine($"Selected: {(_config.IsSelected ? "Yes" : "No")}");
-            logs.AppendLine($"Completed: {(_config.IsCompleted ? "Yes" : "No")}");
-            logs.AppendLine($"Cell Color: {_config.CellColor?.ToString() ?? "Default"}");
-            logs.AppendLine($"Row Color: {_config.RowColor?.ToString() ?? "Default"}");
-
-            // Update the log content
-            LogsTextBlock.Text = logs.ToString();
-
-            // Handle scrolling behavior
-            if (scrollToBottom)
+            foreach (var group in protocolGroups)
             {
-                // For initial load or manual refresh, scroll to bottom
-                LogScrollViewer.ScrollToEnd();
-            }
-            else if (preservePosition)
-            {
-                // For automatic refresh, preserve scroll position unless user wants auto-scroll
-                if (_autoScrollToBottom)
+                var protocol = group.Key;
+                if (!_protocolCards.ContainsKey(protocol))
+                    continue;
+
+                var latestLog = group.OrderByDescending(l => l.Timestamp).First();
+                var allLogs = group.ToArray();
+
+                // Determine status based on logs - FIXED: Only show success if there's actual success
+                ProtocolTestStatus status;
+                string statusText;
+
+                // Check for successful compatibility confirmation
+                if (allLogs.Any(l => l.Step.Contains("Protocol Found") && l.Level == wpfhikip.Models.ProtocolLogLevel.Success))
                 {
-                    LogScrollViewer.ScrollToEnd();
+                    status = ProtocolTestStatus.Success;
+                    statusText = "Compatible";
+                }
+                // Check for explicit compatibility mentions with success level
+                else if (allLogs.Any(l => l.Step.Contains("compatible") && l.Level == wpfhikip.Models.ProtocolLogLevel.Success))
+                {
+                    status = ProtocolTestStatus.Success;
+                    statusText = "Compatible";
+                }
+                // Check for protocol failures
+                else if (allLogs.Any(l => l.Step.Contains("Protocol Failed") && l.Level == wpfhikip.Models.ProtocolLogLevel.Error))
+                {
+                    status = ProtocolTestStatus.Failed;
+                    statusText = "Failed";
+                }
+                // Check for other errors
+                else if (allLogs.Any(l => l.Level == wpfhikip.Models.ProtocolLogLevel.Error))
+                {
+                    status = ProtocolTestStatus.Failed;
+                    statusText = "Failed";
+                }
+                // Check for warnings
+                else if (allLogs.Any(l => l.Level == wpfhikip.Models.ProtocolLogLevel.Warning))
+                {
+                    status = ProtocolTestStatus.Warning;
+                    statusText = "Warning";
+                }
+                // Check if testing is in progress
+                else if (latestLog.Step.Contains("Starting") || latestLog.Step.Contains("Testing"))
+                {
+                    status = ProtocolTestStatus.Testing;
+                    statusText = "Testing...";
                 }
                 else
                 {
-                    // Restore the saved scroll position
-                    LogScrollViewer.ScrollToVerticalOffset(savedVerticalOffset);
-                    LogScrollViewer.ScrollToHorizontalOffset(savedHorizontalOffset);
+                    status = ProtocolTestStatus.Pending;
+                    statusText = "Pending";
                 }
+
+                _protocolCards[protocol].SetStatus(status, statusText);
+            }
+
+            // REMOVED: The problematic logic that always showed detected protocol as compatible
+            // This was causing the issue where any selected protocol would show as "Detected & Compatible"
+            // even when it actually failed the compatibility test
+        }
+
+        private void UpdateActivityLog()
+        {
+            var timestamp = DateTime.Now.ToString("HH:mm:ss");
+            var currentStatus = _camera.Status ?? "No status";
+            var ipAddress = _camera.CurrentIP ?? "N/A";
+            var port = _camera.EffectivePort;
+
+            // Build comprehensive live activity information
+            var activity = new StringBuilder();
+
+            activity.AppendLine($"=== LIVE PROTOCOL MONITORING [{timestamp}] ===");
+            activity.AppendLine($"Target: {ipAddress}:{port}");
+            activity.AppendLine($"Current Status: {currentStatus}");
+            activity.AppendLine($"Authentication: {GetAuthStatus()}");
+            activity.AppendLine();
+
+            // Show detailed protocol logs (excluding system logs)
+            var logs = _camera.ProtocolLogs.ToArray();
+            if (logs.Length > 0)
+            {
+                activity.AppendLine("=== DETAILED PROTOCOL ACTIVITY ===");
+
+                // Group logs by protocol for better readability and normalize protocol names
+                var protocolGroups = logs
+                    .Where(l => ShouldIncludeLogEntry(l))
+                    .GroupBy(l => NormalizeProtocolName(l.Protocol))
+                    .Where(g => !IsSystemProtocol(g.Key))
+                    .OrderBy(g => g.Key);
+
+                foreach (var protocolGroup in protocolGroups)
+                {
+                    activity.AppendLine($"--- {protocolGroup.Key.ToUpper()} PROTOCOL ---");
+
+                    foreach (var log in protocolGroup.OrderBy(l => l.Timestamp))
+                    {
+                        activity.AppendLine($"[{log.FormattedTimestamp}] {log.LogIcon} {log.Step}");
+                        if (!string.IsNullOrEmpty(log.Details))
+                        {
+                            activity.AppendLine($"    └─ {log.Details}");
+                        }
+                    }
+                    activity.AppendLine();
+                }
+            }
+            else
+            {
+                activity.AppendLine("=== PROTOCOL ACTIVITY ===");
+                activity.AppendLine("→ Waiting for protocol checking to begin...");
+                activity.AppendLine("→ Will show detailed steps for each protocol tested");
+                activity.AppendLine();
+
+                // Show what protocols will be tested
+                activity.AppendLine("--- PROTOCOLS TO TEST ---");
+                var protocolsToTest = GetProtocolsToTest();
+                foreach (var protocol in protocolsToTest)
+                {
+                    activity.AppendLine($"• {protocol}");
+                }
+                activity.AppendLine();
+            }
+
+            // Add current status interpretation
+            activity.AppendLine("=== STATUS INTERPRETATION ===");
+            AddStatusInterpretation(activity, currentStatus, ipAddress, port);
+
+            // Add connection summary
+            activity.AppendLine();
+            activity.AppendLine("=== CONNECTION SUMMARY ===");
+            activity.AppendLine($"IP Address: {ipAddress}");
+            activity.AppendLine($"Port: {port} {GetPortType(_camera)}");
+            activity.AppendLine($"Selected Protocol: {_camera.Protocol}");
+            activity.AppendLine($"Username: {_camera.Username ?? "Not set"}");
+            activity.AppendLine($"Total Log Entries: {logs.Where(l => ShouldIncludeLogEntry(l) && !IsSystemProtocol(NormalizeProtocolName(l.Protocol))).Count()}");
+
+            // Store the formatted text for clipboard operations
+            _activityLog.Clear();
+            _activityLog.Append(activity.ToString());
+
+            // Update the display
+            StatusActivityTextBox.Text = activity.ToString();
+
+            // Auto-scroll to bottom if user hasn't manually scrolled
+            if (_autoScrollToBottom)
+            {
+                StatusScrollViewer.ScrollToEnd();
             }
         }
 
-        private void RefreshButton_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Determines if a protocol is a system protocol that should be excluded
+        /// </summary>
+        private bool IsSystemProtocol(string protocolName)
         {
-            // When user clicks refresh, scroll to bottom
-            LoadDetailedLogs(scrollToBottom: true);
+            return protocolName?.ToLower() is "system" or "network" or "unknown";
+        }
+
+        /// <summary>
+        /// Normalizes protocol names to prevent duplication (e.g., "Onvif" and "ONVIF" become "ONVIF")
+        /// </summary>
+        private string NormalizeProtocolName(string protocolName)
+        {
+            return protocolName?.ToLower() switch
+            {
+                "onvif" => "ONVIF",
+                "hikvision" => "Hikvision",
+                "dahua" => "Dahua",
+                "axis" => "Axis",
+                "bosch" => "Bosch",
+                "hanwha" => "Hanwha",
+                "system" => "System",
+                "network" => "Network",
+                _ => protocolName ?? "Unknown"
+            };
+        }
+
+        /// <summary>
+        /// Determines if a log entry should be included in the display
+        /// </summary>
+        private bool ShouldIncludeLogEntry(ModelsProtocolLogEntry log)
+        {
+            // Filter out unwanted log entries
+            if (string.IsNullOrEmpty(log.Step))
+                return false;
+
+            var protocol = NormalizeProtocolName(log.Protocol);
+
+            // Exclude system protocol logs completely
+            if (IsSystemProtocol(protocol))
+                return false;
+
+            // Exclude logs that just mention "step protocol" without useful information
+            if (log.Step.ToLower().Contains("step protocol") && string.IsNullOrEmpty(log.Details))
+                return false;
+
+            // Exclude system protocol references
+            if (log.Step.ToLower().Contains("systep protocol"))
+                return false;
+
+            return true;
+        }
+
+        private string[] GetProtocolsToTest()
+        {
+            var allProtocols = new[] { "Hikvision", "Dahua", "Axis", "ONVIF" };
+
+            // If Auto is selected, show all protocols
+            if (_camera.Protocol == CameraProtocol.Auto)
+            {
+                return allProtocols;
+            }
+
+            // If a specific protocol is selected, prioritize it
+            var selectedProtocol = _camera.Protocol.ToString();
+            if (!string.IsNullOrEmpty(selectedProtocol) && allProtocols.Contains(selectedProtocol))
+            {
+                var prioritized = new[] { selectedProtocol }
+                    .Concat(allProtocols.Where(p => p != selectedProtocol))
+                    .ToArray();
+                return prioritized;
+            }
+
+            return allProtocols;
+        }
+
+        private void AddStatusInterpretation(StringBuilder activity, string currentStatus, string ipAddress, int port)
+        {
+            if (string.IsNullOrEmpty(currentStatus))
+            {
+                activity.AppendLine("→ No status available");
+                return;
+            }
+
+            if (currentStatus.Contains("Checking connectivity"))
+            {
+                activity.AppendLine($"→ Testing network connectivity to {ipAddress}");
+                activity.AppendLine($"→ ICMP ping to verify host is reachable");
+                activity.AppendLine($"→ This step determines if the device is online");
+            }
+            else if (currentStatus.Contains("Ping OK"))
+            {
+                activity.AppendLine($"✓ Network connectivity verified");
+                activity.AppendLine($"→ Host {ipAddress} is reachable");
+                activity.AppendLine($"→ Beginning protocol compatibility testing on port {port}");
+            }
+            else if (currentStatus.Contains("Ping failed"))
+            {
+                activity.AppendLine($"⚠ Network ping failed");
+                activity.AppendLine($"→ Host {ipAddress} may be unreachable or blocking ICMP");
+                activity.AppendLine($"→ Continuing with protocol tests (some devices block ping)");
+            }
+            else if (currentStatus.Contains("checking protocols"))
+            {
+                activity.AppendLine($"→ Testing protocol compatibility on port {port}");
+                activity.AppendLine($"→ Each protocol will attempt specific API endpoints");
+                activity.AppendLine($"→ Authentication will be tested if required");
+            }
+            else if (currentStatus.Contains("Testing") && currentStatus.Contains("protocol"))
+            {
+                var protocol = ExtractProtocolFromStatus(currentStatus);
+                activity.AppendLine($"→ Currently testing {protocol} protocol");
+                activity.AppendLine($"→ Sending API requests to detect compatibility");
+                activity.AppendLine($"→ Timeout set to 15 seconds for this protocol");
+            }
+            else if (currentStatus.Contains("compatible"))
+            {
+                var protocol = ExtractProtocolFromStatus(currentStatus);
+                activity.AppendLine($"✓ {protocol} protocol successfully detected");
+                activity.AppendLine($"→ Device supports {protocol} API endpoints");
+                activity.AppendLine($"→ Ready for configuration operations");
+            }
+            else if (currentStatus.Contains("Sending"))
+            {
+                activity.AppendLine($"→ Transmitting configuration to device");
+                activity.AppendLine($"→ Using authenticated HTTP/HTTPS requests");
+                activity.AppendLine($"→ Waiting for device confirmation");
+            }
+            else if (currentStatus.Contains("successfully") || currentStatus.Contains("sent successfully"))
+            {
+                activity.AppendLine($"✓ Configuration operation completed successfully");
+                activity.AppendLine($"→ Device has confirmed configuration changes");
+                activity.AppendLine($"→ Settings are now active on the device");
+            }
+            else if (currentStatus.Contains("failed") || currentStatus.Contains("Error"))
+            {
+                activity.AppendLine($"✗ Operation failed");
+                activity.AppendLine($"→ Check network connectivity and device status");
+                activity.AppendLine($"→ Verify device compatibility and credentials");
+            }
+            else if (currentStatus.Contains("Auth failed") || currentStatus.Contains("Login failed"))
+            {
+                activity.AppendLine($"✗ Authentication failed");
+                activity.AppendLine($"→ Username or password may be incorrect");
+                activity.AppendLine($"→ Some devices use different default credentials");
+            }
+            else if (currentStatus.Contains("No compatible protocol"))
+            {
+                activity.AppendLine($"✗ No supported protocols found");
+                activity.AppendLine($"→ Device may use unsupported firmware or protocol");
+                activity.AppendLine($"→ Try different ports or check device documentation");
+            }
+            else if (currentStatus.Contains("Check cancelled"))
+            {
+                activity.AppendLine($"⚠ Compatibility check was cancelled");
+                activity.AppendLine($"→ Operation stopped by user or system timeout");
+                activity.AppendLine($"→ Can restart check if needed");
+            }
+            else if (currentStatus.Contains("Timeout") || currentStatus.Contains("timed out"))
+            {
+                activity.AppendLine($"⚠ Protocol check timed out");
+                activity.AppendLine($"→ Device did not respond within timeout period");
+                activity.AppendLine($"→ Try different port or check device status");
+            }
+            else
+            {
+                activity.AppendLine($"→ {currentStatus}");
+            }
+        }
+
+        private string ExtractProtocolFromStatus(string status)
+        {
+            if (status.Contains("Hikvision")) return "Hikvision";
+            if (status.Contains("Dahua")) return "Dahua";
+            if (status.Contains("Axis")) return "Axis";
+            if (status.Contains("ONVIF") || status.Contains("Onvif")) return "ONVIF";
+            return "Unknown";
+        }
+
+        private string GetPortType(Camera camera)
+        {
+            if (!string.IsNullOrEmpty(camera.Port) && int.TryParse(camera.Port, out _))
+            {
+                return "(Custom)";
+            }
+            return "(Default)";
+        }
+
+        private string GetAuthStatus()
+        {
+            var status = _camera.Status ?? "";
+            if (status.Contains("Authentication OK") || status.Contains("Auth OK"))
+                return "Authenticated";
+            if (status.Contains("Auth failed") || status.Contains("Login failed"))
+                return "Failed";
+            if (status.Contains("No auth required"))
+                return "Not Required";
+            return "Pending";
         }
 
         private void CopyLogsButton_Click(object sender, RoutedEventArgs e)
         {
+            CopyLogsToClipboard(sender as Button);
+        }
+
+        private void CopyAllLogsButton_Click(object sender, RoutedEventArgs e)
+        {
+            CopyLogsToClipboard(sender as Button);
+        }
+
+        private void CopyLogsToClipboard(Button clickedButton)
+        {
             try
             {
-                Clipboard.SetText(LogsTextBlock.Text);
-                MessageBox.Show("Logs copied to clipboard successfully!", "Copy Success",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                if (_activityLog.Length > 0)
+                {
+                    Clipboard.SetText(_activityLog.ToString());
+
+                    // Visual feedback
+                    if (clickedButton != null)
+                    {
+                        var originalContent = clickedButton.Content;
+                        clickedButton.Content = "Copied!";
+                        clickedButton.IsEnabled = false;
+
+                        // Reset after 2 seconds
+                        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+                        timer.Tick += (s, e) =>
+                        {
+                            clickedButton.Content = originalContent;
+                            clickedButton.IsEnabled = true;
+                            timer.Stop();
+                        };
+                        timer.Start();
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("No logs available to copy.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to copy logs to clipboard: {ex.Message}", "Copy Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Failed to copy logs to clipboard: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -236,6 +546,120 @@ namespace wpfhikip.Views.Dialogs
         {
             _refreshTimer?.Stop();
             base.OnClosed(e);
+        }
+    }
+
+    /// <summary>
+    /// Represents the status of a protocol test
+    /// </summary>
+    public enum ProtocolTestStatus
+    {
+        Pending,
+        Testing,
+        Success,
+        Failed,
+        Warning
+    }
+
+    /// <summary>
+    /// Custom control for displaying protocol status
+    /// </summary>
+    public class ProtocolStatusCard : Border
+    {
+        private readonly TextBlock _protocolNameBlock;
+        private readonly TextBlock _statusBlock;
+        private readonly Ellipse _statusIndicator;
+
+        public string ProtocolName { get; }
+
+        public ProtocolStatusCard(string protocolName)
+        {
+            ProtocolName = protocolName;
+
+            // Apply base styling
+            Background = new SolidColorBrush(Color.FromRgb(56, 56, 56));
+            CornerRadius = new CornerRadius(6);
+            Padding = new Thickness(12);
+            Margin = new Thickness(5);
+            BorderThickness = new Thickness(2);
+            BorderBrush = new SolidColorBrush(Color.FromRgb(80, 80, 80));
+
+            // Create content
+            var stackPanel = new StackPanel();
+
+            var headerPanel = new StackPanel { Orientation = Orientation.Horizontal };
+
+            _statusIndicator = new Ellipse
+            {
+                Width = 12,
+                Height = 12,
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            _protocolNameBlock = new TextBlock
+            {
+                Text = protocolName,
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.Bold,
+                FontSize = 14,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            headerPanel.Children.Add(_statusIndicator);
+            headerPanel.Children.Add(_protocolNameBlock);
+
+            _statusBlock = new TextBlock
+            {
+                Foreground = Brushes.LightGray,
+                FontSize = 10,
+                FontStyle = FontStyles.Italic,
+                Margin = new Thickness(20, 2, 0, 0)
+            };
+
+            stackPanel.Children.Add(headerPanel);
+            stackPanel.Children.Add(_statusBlock);
+
+            Child = stackPanel;
+
+            // Set initial status
+            SetStatus(ProtocolTestStatus.Pending, "Waiting...");
+        }
+
+        public void SetStatus(ProtocolTestStatus status, string statusText)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                _statusBlock.Text = statusText;
+
+                switch (status)
+                {
+                    case ProtocolTestStatus.Pending:
+                        _statusIndicator.Fill = new SolidColorBrush(Color.FromRgb(128, 128, 128)); // Gray
+                        BorderBrush = new SolidColorBrush(Color.FromRgb(80, 80, 80));
+                        break;
+
+                    case ProtocolTestStatus.Testing:
+                        _statusIndicator.Fill = new SolidColorBrush(Color.FromRgb(255, 193, 7)); // Yellow
+                        BorderBrush = new SolidColorBrush(Color.FromRgb(255, 193, 7));
+                        break;
+
+                    case ProtocolTestStatus.Success:
+                        _statusIndicator.Fill = new SolidColorBrush(Color.FromRgb(40, 167, 69)); // Green
+                        BorderBrush = new SolidColorBrush(Color.FromRgb(40, 167, 69));
+                        break;
+
+                    case ProtocolTestStatus.Failed:
+                        _statusIndicator.Fill = new SolidColorBrush(Color.FromRgb(220, 53, 69)); // Red
+                        BorderBrush = new SolidColorBrush(Color.FromRgb(220, 53, 69));
+                        break;
+
+                    case ProtocolTestStatus.Warning:
+                        _statusIndicator.Fill = new SolidColorBrush(Color.FromRgb(255, 133, 27)); // Orange
+                        BorderBrush = new SolidColorBrush(Color.FromRgb(255, 133, 27));
+                        break;
+                }
+            });
         }
     }
 }

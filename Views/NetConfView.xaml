@@ -15,8 +15,9 @@
         <viewModel:NetConfViewModel />
     </Window.DataContext>
     <Window.Resources>
-        <!-- Add the missing converter -->
+        <!-- Add the converters -->
         <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+        <converters:EnumToStringConverter x:Key="EnumToStringConverter" />
 
         <!-- Modern Button Style with bigger size -->
         <Style x:Key="ModernButtonStyle"
@@ -114,32 +115,28 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <!-- Model Column -->
-                        <DataGridComboBoxColumn Header="Protocol"
+                        <!-- Protocol Column - Updated to properly handle enum binding with converter -->
+                        <DataGridTemplateColumn Header="Protocol"
                                                 Width="80"
                                                 MinWidth="80"
-                                                MaxWidth="80"
-                                                SelectedValueBinding="{Binding Protocol}"
-                                                SelectedValuePath=".">
-                            <DataGridComboBoxColumn.ElementStyle>
-                                <Style TargetType="{x:Type ComboBox}">
-                                    <Setter Property="ItemsSource"
-                                            Value="{Binding Path=DataContext.ProtocolOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
-                                    <Setter Property="FontSize"
-                                            Value="12" />
-                                    <Setter Property="HorizontalContentAlignment"
-                                            Value="Center" />
-                                </Style>
-                            </DataGridComboBoxColumn.ElementStyle>
-                            <DataGridComboBoxColumn.EditingElementStyle>
-                                <Style TargetType="{x:Type ComboBox}">
-                                    <Setter Property="ItemsSource"
-                                            Value="{Binding Path=DataContext.ProtocolOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
-                                    <Setter Property="FontSize"
-                                            Value="12" />
-                                </Style>
-                            </DataGridComboBoxColumn.EditingElementStyle>
-                        </DataGridComboBoxColumn>
+                                                MaxWidth="80">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Protocol, Converter={StaticResource EnumToStringConverter}}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="12" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                            <DataGridTemplateColumn.CellEditingTemplate>
+                                <DataTemplate>
+                                    <ComboBox SelectedValue="{Binding Protocol, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource EnumToStringConverter}}"
+                                              ItemsSource="{Binding Path=DataContext.ProtocolOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                              FontSize="12"
+                                              HorizontalContentAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellEditingTemplate>
+                        </DataGridTemplateColumn>
 
                         <!-- Current IP with custom IP control -->
                         <DataGridTemplateColumn Header="Current IP"

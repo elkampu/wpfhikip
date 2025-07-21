@@ -25,9 +25,14 @@ namespace wpfhikip.Models
         private Brush? _cellColor;
         private FontWeight _cellFontWeight;
         private bool _isCompleted;
+        private CameraProtocol _protocol;
         private readonly ConcurrentQueue<ProtocolLogEntry> _protocolLogs = new();
 
-        public CameraProtocol Protocol { get; set; }
+        public CameraProtocol Protocol
+        {
+            get => _protocol;
+            set => SetProperty(ref _protocol, value);
+        }
 
         public string? Manufacturer
         {

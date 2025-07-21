@@ -471,6 +471,7 @@ namespace wpfhikip.ViewModels
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
+                // Set the detected protocol - this will now trigger PropertyChanged notification
                 camera.Protocol = protocol;
 
                 // Update UI properties directly on camera

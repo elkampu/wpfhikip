@@ -12,6 +12,8 @@
 
             <!-- Converters -->
             <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+            <converters:EnumToStringConverter x:Key="EnumToStringConverter" />
+
         </ResourceDictionary>
     </Application.Resources>
 </Application>

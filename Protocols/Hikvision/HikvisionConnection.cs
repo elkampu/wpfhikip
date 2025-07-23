@@ -232,6 +232,47 @@ namespace wpfhikip.Protocols.Hikvision
             }
         }
 
+        /// <summary>
+        /// Creates an authenticated HttpClient for internal use
+        /// </summary>
+        /// <returns>Configured HttpClient</returns>
+        public HttpClient CreateAuthenticatedHttpClient()
+        {
+            var handler = new HttpClientHandler();
+
+            // Configure authentication based on the authentication mode
+            switch (AuthenticationMode)
+            {
+                case AuthenticationMode.Digest:
+                    var credCache = new CredentialCache();
+                    credCache.Add(new Uri(BuildBaseUrl()), "Digest", new NetworkCredential(Username, Password));
+                    handler.Credentials = credCache;
+                    break;
+
+                case AuthenticationMode.Basic:
+                    handler.Credentials = new NetworkCredential(Username, Password);
+                    break;
+
+                case AuthenticationMode.NTLM:
+                    var ntlmCredCache = new CredentialCache();
+                    ntlmCredCache.Add(new Uri(BuildBaseUrl()), "NTLM", new NetworkCredential(Username, Password));
+                    handler.Credentials = ntlmCredCache;
+                    break;
+
+                default:
+                    handler.Credentials = new NetworkCredential(Username, Password);
+                    break;
+            }
+
+            var client = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
+
+            client.DefaultRequestHeaders.Add("User-Agent", "HikvisionAPI/1.0");
+            return client;
+        }
+
         private void InitializeHttpClient()
         {
             if (_httpClient != null)

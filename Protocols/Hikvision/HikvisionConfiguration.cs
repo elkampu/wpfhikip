@@ -10,24 +10,15 @@ using wpfhikip.Models;
 
 namespace wpfhikip.Protocols.Hikvision
 {
-    class HikvisionConfiguration
+    public class HikvisionConfiguration : IDisposable
     {
-    }
+        private readonly HikvisionConnection _connection;
+        private HttpClient? _httpClient;
+        private bool _disposed = false;
 
-    public class HikvisionApiClient : IDisposable
-    {
-        private readonly HttpClient _httpClient;
-        private readonly string _baseUrl;
-
-        public HikvisionApiClient(string ipAddress, string username, string password, bool useHttps = false)
+        public HikvisionConfiguration(HikvisionConnection connection)
         {
-            var protocol = useHttps ? "https" : "http";
-            _baseUrl = $"{protocol}://{ipAddress}";
-
-            var credCache = new CredentialCache();
-            credCache.Add(new Uri(_baseUrl), "Digest", new NetworkCredential(username, password));
-
-            _httpClient = new HttpClient(new HttpClientHandler { Credentials = credCache });
+            _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         }
 
         /// <summary>
@@ -37,8 +28,10 @@ namespace wpfhikip.Protocols.Hikvision
         {
             try
             {
-                var url = HikvisionUrl.UrlBuilders.BuildGetUrl(_baseUrl.Replace("http://", "").Replace("https://", ""), endpoint);
-                var response = await _httpClient.GetAsync(url);
+                EnsureHttpClient();
+
+                var url = HikvisionUrl.UrlBuilders.BuildGetUrl(_connection.IpAddress, endpoint, _connection.Port == 443);
+                var response = await _httpClient!.GetAsync(url);
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
@@ -67,11 +60,13 @@ namespace wpfhikip.Protocols.Hikvision
         {
             try
             {
-                var url = HikvisionUrl.UrlBuilders.BuildPutUrl(_baseUrl.Replace("http://", "").Replace("https://", ""), endpoint);
+                EnsureHttpClient();
+
+                var url = HikvisionUrl.UrlBuilders.BuildPutUrl(_connection.IpAddress, endpoint, _connection.Port == 443);
                 var content = new StringContent(xmlContent, Encoding.UTF8, ContentTypes.Xml);
                 var request = new HttpRequestMessage(HttpMethod.Put, url) { Content = content };
 
-                var response = await _httpClient.SendAsync(request);
+                var response = await _httpClient!.SendAsync(request);
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
@@ -131,9 +126,117 @@ namespace wpfhikip.Protocols.Hikvision
             }
         }
 
+        /// <summary>
+        /// Gets device information from the camera
+        /// </summary>
+        public async Task<(bool Success, Dictionary<string, string> DeviceInfo, string ErrorMessage)> GetDeviceInfoAsync()
+        {
+            var (success, xmlContent, errorMessage) = await GetConfigurationAsync(HikvisionUrl.DeviceInfo);
+            if (!success)
+            {
+                return (false, new Dictionary<string, string>(), errorMessage);
+            }
+
+            var deviceInfo = HikvisionXmlTemplates.ParseResponseXml(xmlContent);
+            return (true, deviceInfo, string.Empty);
+        }
+
+        /// <summary>
+        /// Gets system capabilities from the camera
+        /// </summary>
+        public async Task<(bool Success, Dictionary<string, string> Capabilities, string ErrorMessage)> GetSystemCapabilitiesAsync()
+        {
+            var (success, xmlContent, errorMessage) = await GetConfigurationAsync(HikvisionUrl.SystemCapabilities);
+            if (!success)
+            {
+                return (false, new Dictionary<string, string>(), errorMessage);
+            }
+
+            var capabilities = HikvisionXmlTemplates.ParseResponseXml(xmlContent);
+            return (true, capabilities, string.Empty);
+        }
+
+        /// <summary>
+        /// Updates network settings on the camera
+        /// </summary>
+        public async Task<(bool Success, string ErrorMessage)> UpdateNetworkSettingsAsync(Camera camera)
+        {
+            return await UpdateConfigurationAsync(HikvisionUrl.NetworkInterfaceIpAddress, camera);
+        }
+
+        /// <summary>
+        /// Updates NTP server settings on the camera
+        /// </summary>
+        public async Task<(bool Success, string ErrorMessage)> UpdateNtpSettingsAsync(Camera camera)
+        {
+            return await UpdateConfigurationAsync(HikvisionUrl.NtpServers, camera);
+        }
+
+        /// <summary>
+        /// Updates system time settings on the camera
+        /// </summary>
+        public async Task<(bool Success, string ErrorMessage)> UpdateTimeSettingsAsync(Camera camera)
+        {
+            return await UpdateConfigurationAsync(HikvisionUrl.SystemTime, camera);
+        }
+
+        /// <summary>
+        /// Reboots the camera
+        /// </summary>
+        public async Task<(bool Success, string ErrorMessage)> RebootCameraAsync()
+        {
+            try
+            {
+                EnsureHttpClient();
+
+                var url = HikvisionUrl.UrlBuilders.BuildPutUrl(_connection.IpAddress, HikvisionUrl.SystemReboot, _connection.Port == 443);
+                var request = new HttpRequestMessage(HttpMethod.Put, url);
+
+                var response = await _httpClient!.SendAsync(request);
+
+                if (response.StatusCode == HttpStatusCode.OK)
+                {
+                    return (true, StatusMessages.Rebooting);
+                }
+                else if (response.StatusCode == HttpStatusCode.Unauthorized)
+                {
+                    return (false, StatusMessages.LoginFailed);
+                }
+                else
+                {
+                    return (false, StatusMessages.RebootError);
+                }
+            }
+            catch (Exception ex)
+            {
+                return (false, $"{StatusMessages.RebootError}: {ex.Message}");
+            }
+        }
+
+        private void EnsureHttpClient()
+        {
+            if (_httpClient == null)
+            {
+                _httpClient = _connection.CreateAuthenticatedHttpClient();
+            }
+        }
+
         public void Dispose()
         {
-            _httpClient?.Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _httpClient?.Dispose();
+                }
+                _disposed = true;
+            }
         }
     }
 }

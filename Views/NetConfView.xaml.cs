@@ -14,6 +14,7 @@ using System.Windows.Shapes;
 
 using wpfhikip.Models;
 using wpfhikip.Views.Dialogs;
+using wpfhikip.Controls;
 
 namespace wpfhikip.Views
 {
@@ -25,6 +26,59 @@ namespace wpfhikip.Views
         public NetConfView()
         {
             InitializeComponent();
+
+            // Add event handler for when cells begin editing
+            dataGrid.BeginningEdit += DataGrid_BeginningEdit;
+        }
+
+        private void DataGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
+        {
+            // Check if the editing cell contains an IP Address control
+            if (e.Column is DataGridTemplateColumn templateColumn)
+            {
+                var columnHeader = templateColumn.Header?.ToString();
+
+                // Check if this is one of the IP Address columns
+                if (columnHeader == "Current IP" || columnHeader == "New IP" ||
+                    columnHeader == "Mask" || columnHeader == "Gateway" || columnHeader == "NTP")
+                {
+                    // Use dispatcher to ensure the edit template is loaded before trying to find the control
+                    Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
+                    {
+                        var cellContent = e.Column.GetCellContent(e.Row.Item);
+                        if (cellContent != null)
+                        {
+                            // Find the IpAddressControl within the cell
+                            var ipControl = FindVisualChild<IpAddressControl>(cellContent);
+                            if (ipControl != null)
+                            {
+                                // Focus the first octet
+                                ipControl.FocusFirstOctet();
+                            }
+                        }
+                    }));
+                }
+            }
+        }
+
+        // Helper method to find a child control of a specific type
+        private static T FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T result)
+                {
+                    return result;
+                }
+
+                var childResult = FindVisualChild<T>(child);
+                if (childResult != null)
+                {
+                    return childResult;
+                }
+            }
+            return null;
         }
 
         // COPY & PASTE
@@ -67,6 +121,19 @@ namespace wpfhikip.Views
             }
         }
 
+        // New event handler for status button clicks
+        private void StatusButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is Camera camera)
+            {
+                // Create and show the status detail dialog
+                var statusDialog = new StatusDetailDialog(camera);
+                statusDialog.Owner = this;
+                statusDialog.ShowDialog();
+            }
+        }
+
+        // Keep the old method for backward compatibility if needed
         private void StatusTextBlock_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (sender is TextBlock textBlock && textBlock.Tag is Camera camera)

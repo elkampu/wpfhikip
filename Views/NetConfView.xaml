@@ -72,6 +72,93 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Status Button Style for DataGrid cells -->
+        <Style x:Key="StatusButtonStyle"
+               TargetType="Button">
+            <Setter Property="Background"
+                    Value="{Binding CellColor}" />
+            <Setter Property="Foreground"
+                    Value="Black" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="BorderBrush"
+                    Value="#FF808080" />
+            <Setter Property="FontWeight"
+                    Value="Medium" />
+            <Setter Property="FontSize"
+                    Value="10" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Margin"
+                    Value="2" />
+            <Setter Property="Padding"
+                    Value="4,2" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                BorderBrush="{TemplateBinding BorderBrush}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- Specific triggers for different background colors to ensure readability -->
+                            <DataTrigger Binding="{Binding CellColor}"
+                                         Value="{x:Static Brushes.LightYellow}">
+                                <Setter Property="Foreground"
+                                        Value="Black" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding CellColor}"
+                                         Value="{x:Static Brushes.LightGreen}">
+                                <Setter Property="Foreground"
+                                        Value="Black" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding CellColor}"
+                                         Value="{x:Static Brushes.Orange}">
+                                <Setter Property="Foreground"
+                                        Value="Black" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding CellColor}"
+                                         Value="{x:Static Brushes.LightCoral}">
+                                <Setter Property="Foreground"
+                                        Value="Black" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding CellColor}"
+                                         Value="{x:Static Brushes.LightGray}">
+                                <Setter Property="Foreground"
+                                        Value="Black" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding CellColor}"
+                                         Value="{x:Static Brushes.Red}">
+                                <Setter Property="Foreground"
+                                        Value="White" />
+                            </DataTrigger>
+
+                            <!-- Hover effects -->
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter Property="BorderBrush"
+                                        Value="#FF000000" />
+                                <Setter Property="BorderThickness"
+                                        Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter Property="BorderBrush"
+                                        Value="#FF000000" />
+                                <Setter Property="BorderThickness"
+                                        Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -93,7 +180,8 @@
                           Height="400"
                           RowHeight="32"
                           ItemsSource="{Binding Cameras, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                          PreviewKeyDown="DataGrid_PreviewKeyDown">
+                          PreviewKeyDown="DataGrid_PreviewKeyDown"
+                          BeginningEdit="DataGrid_BeginningEdit">
                     <DataGrid.RowStyle>
                         <Style TargetType="DataGridRow">
                             <Setter Property="Background"
@@ -303,23 +391,12 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
 
-                        <!-- Network Status Column -->
                         <DataGridTextColumn Header="Net"
                                             Width="70"
                                             MinWidth="70"
                                             MaxWidth="70"
                                             Binding="{Binding OnlineStatus}"
                                             IsReadOnly="True">
-                            <DataGridTextColumn.CellStyle>
-                                <Style TargetType="DataGridCell">
-                                    <Setter Property="Background"
-                                            Value="{Binding CellColor}" />
-                                    <Setter Property="HorizontalContentAlignment"
-                                            Value="Center" />
-                                    <Setter Property="VerticalContentAlignment"
-                                            Value="Center" />
-                                </Style>
-                            </DataGridTextColumn.CellStyle>
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="HorizontalAlignment"
@@ -334,7 +411,7 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
 
-                        <!-- Request Status Column with click functionality -->
+                        <!-- Status Column with button-like appearance -->
                         <DataGridTemplateColumn Header="Status"
                                                 Width="90"
                                                 MinWidth="90"
@@ -342,15 +419,13 @@
                                                 IsReadOnly="True">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding ShortStatus}"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontSize="11"
-                                               FontWeight="Medium"
-                                               Cursor="Hand"
-                                               ToolTip="Click to see detailed status logs"
-                                               MouseLeftButtonDown="StatusTextBlock_MouseLeftButtonDown"
-                                               Tag="{Binding}" />
+                                    <Button Content="{Binding ShortStatus}"
+                                            Style="{StaticResource StatusButtonStyle}"
+                                            Click="StatusButton_Click"
+                                            Tag="{Binding}"
+                                            ToolTip="Click to see detailed status logs"
+                                            HorizontalAlignment="Stretch"
+                                            VerticalAlignment="Stretch" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>

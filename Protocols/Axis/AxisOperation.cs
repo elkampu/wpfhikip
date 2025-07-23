@@ -7,15 +7,15 @@ using System.Threading.Tasks;
 
 using wpfhikip.Models;
 
-namespace wpfhikip.Protocols.Hikvision
+namespace wpfhikip.Protocols.Axis
 {
-    public class HikvisionOperation : IDisposable
+    public class AxisOperation : IDisposable
     {
-        private readonly HikvisionConnection _connection;
+        private readonly AxisConnection _connection;
         private HttpClient? _httpClient;
         private bool _disposed = false;
 
-        public HikvisionOperation(HikvisionConnection connection)
+        public AxisOperation(AxisConnection connection)
         {
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         }
@@ -23,32 +23,33 @@ namespace wpfhikip.Protocols.Hikvision
         /// <summary>
         /// Gets the RTSP stream URL for live video
         /// </summary>
-        public string GetRtspStreamUrl(int channel = 1, int subType = 0)
+        public string GetRtspStreamUrl(int channel = 1, string profile = "1")
         {
             var protocol = _connection.Port == 443 ? "rtsps" : "rtsp";
-            return $"{protocol}://{_connection.Username}:{_connection.Password}@{_connection.IpAddress}:554/Streaming/Channels/{channel}0{subType}";
+            var port = _connection.Port == 443 ? 322 : 554; // Axis RTSP ports
+            return $"{protocol}://{_connection.Username}:{_connection.Password}@{_connection.IpAddress}:{port}/axis-media/media.amp?camera={channel}&videocodec=h264&resolution=1920x1080";
         }
 
         /// <summary>
-        /// Gets the HTTP stream URL for live video
+        /// Gets the MJPEG stream URL for live video
         /// </summary>
-        public string GetHttpStreamUrl(int channel = 1, int subType = 0)
+        public string GetMjpegStreamUrl(int channel = 1, int resolution = 1920)
         {
             var protocol = _connection.Port == 443 ? "https" : "http";
             var port = _connection.Port == 443 ? 443 : 80;
-            return $"{protocol}://{_connection.IpAddress}:{port}/ISAPI/Streaming/channels/{channel}0{subType}/picture";
+            return $"{protocol}://{_connection.IpAddress}:{port}/axis-cgi/mjpg/video.cgi?camera={channel}&resolution={resolution}x{resolution * 9 / 16}";
         }
 
         /// <summary>
         /// Captures a snapshot from the camera
         /// </summary>
-        public async Task<(bool Success, byte[] ImageData, string ErrorMessage)> CaptureSnapshotAsync(int channel = 1)
+        public async Task<(bool Success, byte[] ImageData, string ErrorMessage)> CaptureSnapshotAsync(int channel = 1, int resolution = 1920)
         {
             try
             {
                 EnsureHttpClient();
 
-                var url = $"{GetBaseUrl()}/ISAPI/Streaming/channels/{channel}01/picture";
+                var url = $"{GetBaseUrl()}/axis-cgi/jpg/image.cgi?camera={channel}&resolution={resolution}x{resolution * 9 / 16}";
                 var response = await _httpClient!.GetAsync(url);
 
                 if (response.IsSuccessStatusCode)
@@ -70,17 +71,16 @@ namespace wpfhikip.Protocols.Hikvision
         /// <summary>
         /// Sends PTZ command to the camera
         /// </summary>
-        public async Task<(bool Success, string ErrorMessage)> SendPtzCommandAsync(PtzCommand command, int channel = 1, int speed = 50)
+        public async Task<(bool Success, string ErrorMessage)> SendPtzCommandAsync(AxisPtzCommand command, int channel = 1, int speed = 50)
         {
             try
             {
                 EnsureHttpClient();
 
-                var ptzData = GeneratePtzXml(command, speed);
-                var url = $"{GetBaseUrl()}/ISAPI/PTZCtrl/channels/{channel}/continuous";
+                var ptzParams = GeneratePtzParams(command, speed);
+                var url = $"{GetBaseUrl()}/axis-cgi/com/ptz.cgi?camera={channel}&{ptzParams}";
 
-                var content = new StringContent(ptzData, Encoding.UTF8, ContentTypes.Xml);
-                var response = await _httpClient!.PutAsync(url, content);
+                var response = await _httpClient!.GetAsync(url);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -100,29 +100,29 @@ namespace wpfhikip.Protocols.Hikvision
         /// <summary>
         /// Gets camera status information
         /// </summary>
-        public async Task<(bool Success, Dictionary<string, string> Status, string ErrorMessage)> GetCameraStatusAsync()
+        public async Task<(bool Success, Dictionary<string, object> Status, string ErrorMessage)> GetCameraStatusAsync()
         {
             try
             {
                 EnsureHttpClient();
 
-                var url = $"{GetBaseUrl()}/ISAPI/System/status";
+                var url = $"{GetBaseUrl()}/axis-cgi/param.cgi?action=list&group=Properties.System";
                 var response = await _httpClient!.GetAsync(url);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var xmlContent = await response.Content.ReadAsStringAsync();
-                    var status = HikvisionXmlTemplates.ParseResponseXml(xmlContent);
+                    var content = await response.Content.ReadAsStringAsync();
+                    var status = ParseAxisParameterResponse(content);
                     return (true, status, string.Empty);
                 }
                 else
                 {
-                    return (false, new Dictionary<string, string>(), $"Failed to get status: {response.StatusCode}");
+                    return (false, new Dictionary<string, object>(), $"Failed to get status: {response.StatusCode}");
                 }
             }
             catch (Exception ex)
             {
-                return (false, new Dictionary<string, string>(), $"Error getting camera status: {ex.Message}");
+                return (false, new Dictionary<string, object>(), $"Error getting camera status: {ex.Message}");
             }
         }
 
@@ -135,13 +135,13 @@ namespace wpfhikip.Protocols.Hikvision
             {
                 EnsureHttpClient();
 
-                var url = $"{GetBaseUrl()}/ISAPI/ContentMgmt/record/status/channels/{channel}";
+                var url = $"{GetBaseUrl()}/axis-cgi/param.cgi?action=list&group=Properties.LocalStorage.Recording";
                 var response = await _httpClient!.GetAsync(url);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var xmlContent = await response.Content.ReadAsStringAsync();
-                    var isRecording = xmlContent.Contains("<enabled>true</enabled>", StringComparison.OrdinalIgnoreCase);
+                    var content = await response.Content.ReadAsStringAsync();
+                    var isRecording = content.Contains("Recording=yes", StringComparison.OrdinalIgnoreCase);
                     return (true, isRecording, string.Empty);
                 }
                 else
@@ -164,11 +164,10 @@ namespace wpfhikip.Protocols.Hikvision
             {
                 EnsureHttpClient();
 
-                var recordingXml = GenerateRecordingXml(enable);
-                var url = $"{GetBaseUrl()}/ISAPI/ContentMgmt/record/tracks/{channel}01";
+                var action = enable ? "start" : "stop";
+                var url = $"{GetBaseUrl()}/axis-cgi/record/{action}.cgi?camera={channel}";
 
-                var content = new StringContent(recordingXml, Encoding.UTF8, ContentTypes.Xml);
-                var response = await _httpClient!.PutAsync(url, content);
+                var response = await _httpClient!.GetAsync(url);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -185,6 +184,35 @@ namespace wpfhikip.Protocols.Hikvision
             }
         }
 
+        /// <summary>
+        /// Gets motion detection status
+        /// </summary>
+        public async Task<(bool Success, bool IsMotionDetected, string ErrorMessage)> GetMotionDetectionStatusAsync()
+        {
+            try
+            {
+                EnsureHttpClient();
+
+                var url = $"{GetBaseUrl()}/axis-cgi/param.cgi?action=list&group=Properties.Motion";
+                var response = await _httpClient!.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var isMotionDetected = content.Contains("Motion=yes", StringComparison.OrdinalIgnoreCase);
+                    return (true, isMotionDetected, string.Empty);
+                }
+                else
+                {
+                    return (false, false, $"Failed to get motion detection status: {response.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                return (false, false, $"Error getting motion detection status: {ex.Message}");
+            }
+        }
+
         private string GetBaseUrl()
         {
             var protocol = _connection.Port == 443 ? "https" : "http";
@@ -192,39 +220,46 @@ namespace wpfhikip.Protocols.Hikvision
             return $"{protocol}://{_connection.IpAddress}{portSuffix}";
         }
 
-        private string GeneratePtzXml(PtzCommand command, int speed)
-        {
-            var (pan, tilt, zoom) = GetPtzValues(command, speed);
-
-            return $@"<?xml version='1.0' encoding='UTF-8'?>
-<PTZData xmlns='http://www.hikvision.com/ver20/XMLSchema' version='2.0'>
-    <pan>{pan}</pan>
-    <tilt>{tilt}</tilt>
-    <zoom>{zoom}</zoom>
-</PTZData>";
-        }
-
-        private (int pan, int tilt, int zoom) GetPtzValues(PtzCommand command, int speed)
+        private string GeneratePtzParams(AxisPtzCommand command, int speed)
         {
             return command switch
             {
-                PtzCommand.Left => (-speed, 0, 0),
-                PtzCommand.Right => (speed, 0, 0),
-                PtzCommand.Up => (0, speed, 0),
-                PtzCommand.Down => (0, -speed, 0),
-                PtzCommand.ZoomIn => (0, 0, speed),
-                PtzCommand.ZoomOut => (0, 0, -speed),
-                PtzCommand.Stop => (0, 0, 0),
-                _ => (0, 0, 0)
+                AxisPtzCommand.Left => $"move=left&speed={speed}",
+                AxisPtzCommand.Right => $"move=right&speed={speed}",
+                AxisPtzCommand.Up => $"move=up&speed={speed}",
+                AxisPtzCommand.Down => $"move=down&speed={speed}",
+                AxisPtzCommand.ZoomIn => $"zoom=tele&speed={speed}",
+                AxisPtzCommand.ZoomOut => $"zoom=wide&speed={speed}",
+                AxisPtzCommand.Stop => "move=stop",
+                AxisPtzCommand.Home => "move=home",
+                AxisPtzCommand.UpLeft => $"move=upleft&speed={speed}",
+                AxisPtzCommand.UpRight => $"move=upright&speed={speed}",
+                AxisPtzCommand.DownLeft => $"move=downleft&speed={speed}",
+                AxisPtzCommand.DownRight => $"move=downright&speed={speed}",
+                _ => "move=stop"
             };
         }
 
-        private string GenerateRecordingXml(bool enable)
+        private Dictionary<string, object> ParseAxisParameterResponse(string response)
         {
-            return $@"<?xml version='1.0' encoding='UTF-8'?>
-<Track xmlns='http://www.hikvision.com/ver20/XMLSchema' version='2.0'>
-    <enabled>{enable.ToString().ToLower()}</enabled>
-</Track>";
+            var result = new Dictionary<string, object>();
+
+            if (string.IsNullOrWhiteSpace(response))
+                return result;
+
+            var lines = response.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines)
+            {
+                var equalIndex = line.IndexOf('=');
+                if (equalIndex > 0)
+                {
+                    var key = line.Substring(0, equalIndex).Trim();
+                    var value = line.Substring(equalIndex + 1).Trim();
+                    result[key] = value;
+                }
+            }
+
+            return result;
         }
 
         private void EnsureHttpClient()
@@ -255,9 +290,9 @@ namespace wpfhikip.Protocols.Hikvision
     }
 
     /// <summary>
-    /// PTZ command enumeration
+    /// Axis PTZ command enumeration
     /// </summary>
-    public enum PtzCommand
+    public enum AxisPtzCommand
     {
         Stop,
         Up,
@@ -269,6 +304,7 @@ namespace wpfhikip.Protocols.Hikvision
         UpLeft,
         UpRight,
         DownLeft,
-        DownRight
+        DownRight,
+        Home
     }
 }

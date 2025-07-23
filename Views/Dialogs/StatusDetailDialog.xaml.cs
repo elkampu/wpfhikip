@@ -211,11 +211,6 @@ namespace wpfhikip.Views.Dialogs
             // Build comprehensive live activity information
             var activity = new StringBuilder();
 
-            activity.AppendLine($"=== LIVE PROTOCOL MONITORING [{timestamp}] ===");
-            activity.AppendLine($"Target: {ipAddress}:{port}");
-            activity.AppendLine($"Current Status: {currentStatus}");
-            activity.AppendLine($"Authentication: {GetAuthStatus()}");
-            activity.AppendLine();
 
             // Show detailed protocol logs (excluding system logs)
             var logs = _camera.ProtocolLogs.ToArray();
@@ -247,10 +242,6 @@ namespace wpfhikip.Views.Dialogs
             }
             else
             {
-                activity.AppendLine("=== PROTOCOL ACTIVITY ===");
-                activity.AppendLine("→ Waiting for protocol checking to begin...");
-                activity.AppendLine("→ Will show detailed steps for each protocol tested");
-                activity.AppendLine();
 
                 // Show what protocols will be tested
                 activity.AppendLine("--- PROTOCOLS TO TEST ---");
@@ -262,9 +253,6 @@ namespace wpfhikip.Views.Dialogs
                 activity.AppendLine();
             }
 
-            // Add current status interpretation
-            activity.AppendLine("=== STATUS INTERPRETATION ===");
-            AddStatusInterpretation(activity, currentStatus, ipAddress, port);
 
             // Add connection summary
             activity.AppendLine();
@@ -365,100 +353,7 @@ namespace wpfhikip.Views.Dialogs
             return allProtocols;
         }
 
-        private void AddStatusInterpretation(StringBuilder activity, string currentStatus, string ipAddress, int port)
-        {
-            if (string.IsNullOrEmpty(currentStatus))
-            {
-                activity.AppendLine("→ No status available");
-                return;
-            }
-
-            if (currentStatus.Contains("Checking connectivity"))
-            {
-                activity.AppendLine($"→ Testing network connectivity to {ipAddress}");
-                activity.AppendLine($"→ ICMP ping to verify host is reachable");
-                activity.AppendLine($"→ This step determines if the device is online");
-            }
-            else if (currentStatus.Contains("Ping OK"))
-            {
-                activity.AppendLine($"✓ Network connectivity verified");
-                activity.AppendLine($"→ Host {ipAddress} is reachable");
-                activity.AppendLine($"→ Beginning protocol compatibility testing on port {port}");
-            }
-            else if (currentStatus.Contains("Ping failed"))
-            {
-                activity.AppendLine($"⚠ Network ping failed");
-                activity.AppendLine($"→ Host {ipAddress} may be unreachable or blocking ICMP");
-                activity.AppendLine($"→ Continuing with protocol tests (some devices block ping)");
-            }
-            else if (currentStatus.Contains("checking protocols"))
-            {
-                activity.AppendLine($"→ Testing protocol compatibility on port {port}");
-                activity.AppendLine($"→ Each protocol will attempt specific API endpoints");
-                activity.AppendLine($"→ Authentication will be tested if required");
-            }
-            else if (currentStatus.Contains("Testing") && currentStatus.Contains("protocol"))
-            {
-                var protocol = ExtractProtocolFromStatus(currentStatus);
-                activity.AppendLine($"→ Currently testing {protocol} protocol");
-                activity.AppendLine($"→ Sending API requests to detect compatibility");
-                activity.AppendLine($"→ Timeout set to 15 seconds for this protocol");
-            }
-            else if (currentStatus.Contains("compatible"))
-            {
-                var protocol = ExtractProtocolFromStatus(currentStatus);
-                activity.AppendLine($"✓ {protocol} protocol successfully detected");
-                activity.AppendLine($"→ Device supports {protocol} API endpoints");
-                activity.AppendLine($"→ Ready for configuration operations");
-            }
-            else if (currentStatus.Contains("Sending"))
-            {
-                activity.AppendLine($"→ Transmitting configuration to device");
-                activity.AppendLine($"→ Using authenticated HTTP/HTTPS requests");
-                activity.AppendLine($"→ Waiting for device confirmation");
-            }
-            else if (currentStatus.Contains("successfully") || currentStatus.Contains("sent successfully"))
-            {
-                activity.AppendLine($"✓ Configuration operation completed successfully");
-                activity.AppendLine($"→ Device has confirmed configuration changes");
-                activity.AppendLine($"→ Settings are now active on the device");
-            }
-            else if (currentStatus.Contains("failed") || currentStatus.Contains("Error"))
-            {
-                activity.AppendLine($"✗ Operation failed");
-                activity.AppendLine($"→ Check network connectivity and device status");
-                activity.AppendLine($"→ Verify device compatibility and credentials");
-            }
-            else if (currentStatus.Contains("Auth failed") || currentStatus.Contains("Login failed"))
-            {
-                activity.AppendLine($"✗ Authentication failed");
-                activity.AppendLine($"→ Username or password may be incorrect");
-                activity.AppendLine($"→ Some devices use different default credentials");
-            }
-            else if (currentStatus.Contains("No compatible protocol"))
-            {
-                activity.AppendLine($"✗ No supported protocols found");
-                activity.AppendLine($"→ Device may use unsupported firmware or protocol");
-                activity.AppendLine($"→ Try different ports or check device documentation");
-            }
-            else if (currentStatus.Contains("Check cancelled"))
-            {
-                activity.AppendLine($"⚠ Compatibility check was cancelled");
-                activity.AppendLine($"→ Operation stopped by user or system timeout");
-                activity.AppendLine($"→ Can restart check if needed");
-            }
-            else if (currentStatus.Contains("Timeout") || currentStatus.Contains("timed out"))
-            {
-                activity.AppendLine($"⚠ Protocol check timed out");
-                activity.AppendLine($"→ Device did not respond within timeout period");
-                activity.AppendLine($"→ Try different port or check device status");
-            }
-            else
-            {
-                activity.AppendLine($"→ {currentStatus}");
-            }
-        }
-
+        
         private string ExtractProtocolFromStatus(string status)
         {
             if (status.Contains("Hikvision")) return "Hikvision";

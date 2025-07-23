@@ -4,7 +4,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 
 using wpfhikip.Models;
@@ -216,83 +215,6 @@ namespace wpfhikip.Protocols.Axis
             }
         }
 
-        // Add this method to AxisConnection class:
-
-        /// <summary>
-        /// Sends network configuration to the Axis device using Camera object
-        /// </summary>
-        /// <param name="camera">Camera object containing configuration</param>
-        /// <returns>Operation result</returns>
-        public async Task<AxisOperationResult> SendNetworkConfigurationAsync(Camera camera)
-        {
-            try
-            {
-                InitializeHttpClientWithAuth();
-
-                // Create the JSON request for setting IPv4 configuration
-                var jsonRequest = AxisJsonTemplates.CreateSetIPv4ConfigJson(camera);
-                var content = new StringContent(jsonRequest, Encoding.UTF8, AxisContentTypes.Json);
-
-                var networkSettingsUrl = BuildUrl(AxisUrl.NetworkSettings);
-                var response = await _httpClient.PostAsync(networkSettingsUrl, content);
-
-                if (response.StatusCode == HttpStatusCode.OK)
-                {
-                    var responseContent = await response.Content.ReadAsStringAsync();
-
-                    // Parse response to check for errors
-                    try
-                    {
-                        using var document = JsonDocument.Parse(responseContent);
-                        var root = document.RootElement;
-
-                        if (root.TryGetProperty("error", out var errorElement))
-                        {
-                            var errorCode = errorElement.GetProperty("code").GetInt32();
-                            var errorMessage = errorElement.GetProperty("message").GetString();
-
-                            return new AxisOperationResult
-                            {
-                                Success = false,
-                                Message = $"Axis API error {errorCode}: {errorMessage}"
-                            };
-                        }
-
-                        return new AxisOperationResult
-                        {
-                            Success = true,
-                            Message = AxisStatusMessages.NetworkSettingsSent
-                        };
-                    }
-                    catch
-                    {
-                        // If we can't parse the response, assume success if status was OK
-                        return new AxisOperationResult
-                        {
-                            Success = true,
-                            Message = AxisStatusMessages.NetworkSettingsSent
-                        };
-                    }
-                }
-                else
-                {
-                    return new AxisOperationResult
-                    {
-                        Success = false,
-                        Message = $"Failed to send network configuration: {response.StatusCode}"
-                    };
-                }
-            }
-            catch (Exception ex)
-            {
-                return new AxisOperationResult
-                {
-                    Success = false,
-                    Message = $"Error sending network configuration: {ex.Message}"
-                };
-            }
-        }
-
         /// <summary>
         /// Synchronous version of CheckCompatibilityAsync for UI compatibility
         /// </summary>
@@ -308,6 +230,44 @@ namespace wpfhikip.Protocols.Axis
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Creates an authenticated HttpClient for internal use
+        /// </summary>
+        /// <returns>Configured HttpClient</returns>
+        public HttpClient CreateAuthenticatedHttpClient()
+        {
+            var handler = new HttpClientHandler();
+
+            // Axis typically uses Basic authentication
+            switch (AuthenticationMode)
+            {
+                case AuthenticationMode.Basic:
+                default:
+                    handler.Credentials = new NetworkCredential(Username, Password);
+                    break;
+
+                case AuthenticationMode.Digest:
+                    var credCache = new CredentialCache();
+                    credCache.Add(new Uri(BuildBaseUrl()), "Digest", new NetworkCredential(Username, Password));
+                    handler.Credentials = credCache;
+                    break;
+
+                case AuthenticationMode.NTLM:
+                    var ntlmCredCache = new CredentialCache();
+                    ntlmCredCache.Add(new Uri(BuildBaseUrl()), "NTLM", new NetworkCredential(Username, Password));
+                    handler.Credentials = ntlmCredCache;
+                    break;
+            }
+
+            var client = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
+
+            client.DefaultRequestHeaders.Add("User-Agent", "AxisAPI/1.0");
+            return client;
         }
 
         private void InitializeHttpClient()

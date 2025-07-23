@@ -80,7 +80,10 @@ namespace wpfhikip.ViewModels
             return new Camera
             {
                 Protocol = CameraProtocol.Auto, // Set Auto as default
-                Connection = new CameraConnection(),
+                Connection = new CameraConnection()
+                {
+                    Port = "80", // Default port
+                },
                 Settings = new CameraSettings(),
                 VideoStream = new CameraVideoStream()
             };
@@ -158,16 +161,30 @@ namespace wpfhikip.ViewModels
                 // Run compatibility checks in parallel
                 var tasks = selectedCameras.Select(camera => CheckSingleCameraCompatibilityAsync(camera, _compatibilityCheckCancellation.Token));
                 await Task.WhenAll(tasks);
+
+                // No group evaluation - each camera keeps its individual result
             }
             catch (OperationCanceledException)
             {
                 foreach (var camera in selectedCameras)
                 {
                     camera.AddProtocolLog("System", "Check Cancelled", "Compatibility check was cancelled by user or system");
+
+                    // Only set to cancelled/grey if the camera hasn't already been processed successfully
                     Application.Current.Dispatcher.Invoke(() =>
                     {
-                        camera.Status = "Check cancelled";
-                        camera.CellColor = Brushes.LightGray;
+                        // Don't override cameras that already have a final status (Orange, Green, Red)
+                        if (camera.CellColor == Brushes.LightYellow || camera.CellColor == null ||
+                            camera.Status?.Contains("Testing") == true || camera.Status?.Contains("Checking") == true)
+                        {
+                            camera.Status = "Check cancelled";
+                            camera.CellColor = Brushes.LightGray;
+                        }
+                        else
+                        {
+                            // Camera already has a final status - don't change it
+                            camera.AddProtocolLog("System", "Check Cancelled", $"Check cancelled but keeping existing status: {camera.Status}", Models.ProtocolLogLevel.Info);
+                        }
                     });
                 }
             }
@@ -185,7 +202,6 @@ namespace wpfhikip.ViewModels
                 _compatibilityCheckCancellation = null;
             }
         }
-
         private async Task<bool> PingCameraAsync(string ipAddress, int timeoutMs = 3000)
         {
             try
@@ -244,6 +260,11 @@ namespace wpfhikip.ViewModels
                 camera.AddProtocolLog("System", "Protocol Order", $"Testing protocols in order: {string.Join(", ", protocolsToCheck)}");
 
                 bool protocolFound = false;
+                CameraProtocol? detectedProtocol = null;
+                bool requiresAuth = false;
+                bool isAuthenticated = false;
+                string authMessage = string.Empty;
+
                 foreach (var protocol in protocolsToCheck)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -260,6 +281,11 @@ namespace wpfhikip.ViewModels
                     {
                         camera.AddProtocolLog(protocol.ToString(), "Protocol Found", $"{protocol} protocol confirmed and compatible", Models.ProtocolLogLevel.Success);
                         protocolFound = true;
+                        detectedProtocol = protocol;
+                        // The UpdateCameraForProtocol already set the status and color, but let's capture the details
+                        var currentStatus = camera.Status ?? "";
+                        requiresAuth = currentStatus.Contains("Auth failed") || currentStatus.Contains("Authentication");
+                        isAuthenticated = currentStatus.Contains("Authentication OK");
                         break;
                     }
                     else
@@ -268,6 +294,7 @@ namespace wpfhikip.ViewModels
                     }
                 }
 
+                // Final status check - DO NOT override if protocol was found and status was already set correctly
                 if (!protocolFound)
                 {
                     camera.AddProtocolLog("System", "Check Complete", "No compatible protocols found", Models.ProtocolLogLevel.Error);
@@ -277,12 +304,21 @@ namespace wpfhikip.ViewModels
                         camera.Status = isPingSuccessful
                             ? "No compatible protocol found"
                             : "Ping failed, no compatible protocol found";
-                        camera.CellColor = Brushes.LightCoral;
+                        camera.CellColor = Brushes.LightCoral; // RED for complete failure
+                        camera.AddProtocolLog("System", "Final Status", $"Camera final status set to: {camera.Status}, Color: LightCoral", Models.ProtocolLogLevel.Info);
                     });
                 }
                 else
                 {
+                    // Protocol was found - just log the completion without changing status
                     camera.AddProtocolLog("System", "Check Complete", "Compatibility check completed successfully", Models.ProtocolLogLevel.Success);
+
+                    // Debug log to confirm the final state
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        var colorName = GetBrushName(camera.CellColor);
+                        camera.AddProtocolLog("System", "Final Status", $"Camera final status: {camera.Status}, Color: {colorName}", Models.ProtocolLogLevel.Success);
+                    });
                 }
             }
             catch (OperationCanceledException)
@@ -307,6 +343,18 @@ namespace wpfhikip.ViewModels
                 });
             }
         }
+
+        private string GetBrushName(Brush? brush)
+        {
+            if (brush == Brushes.LightGreen) return "LightGreen";
+            if (brush == Brushes.Orange) return "Orange";
+            if (brush == Brushes.LightCoral) return "LightCoral";
+            if (brush == Brushes.LightGray) return "LightGray";
+            if (brush == Brushes.Red) return "Red";
+            if (brush == Brushes.LightYellow) return "LightYellow";
+            return brush?.ToString() ?? "null";
+        }
+
 
         private List<CameraProtocol> GetProtocolCheckOrder(CameraProtocol selectedProtocol)
         {
@@ -471,27 +519,30 @@ namespace wpfhikip.ViewModels
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                // Set the detected protocol - this will now trigger PropertyChanged notification
+                // Set the detected protocol
                 camera.Protocol = protocol;
 
-                // Update UI properties directly on camera
+                // Update UI properties based on authentication results
                 if (requiresAuthentication)
                 {
                     if (isAuthenticated)
                     {
                         camera.Status = $"{protocol} compatible - Authentication OK";
                         camera.CellColor = Brushes.LightGreen;
+                        camera.AddProtocolLog("System", "UpdateCameraForProtocol", $"Set to GREEN: {camera.Status}", Models.ProtocolLogLevel.Success);
                     }
                     else
                     {
                         camera.Status = $"{protocol} compatible - Auth failed: {authenticationMessage}";
                         camera.CellColor = Brushes.Orange;
+                        camera.AddProtocolLog("System", "UpdateCameraForProtocol", $"Set to ORANGE: {camera.Status}", Models.ProtocolLogLevel.Warning);
                     }
                 }
                 else
                 {
                     camera.Status = $"{protocol} compatible - No auth required";
                     camera.CellColor = Brushes.LightGreen;
+                    camera.AddProtocolLog("System", "UpdateCameraForProtocol", $"Set to GREEN: {camera.Status}", Models.ProtocolLogLevel.Success);
                 }
             });
         }

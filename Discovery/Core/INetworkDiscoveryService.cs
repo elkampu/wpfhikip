@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-
-using wpfhikip.Discovery.Protocols.PortScan;
+﻿using wpfhikip.Discovery.Protocols.PortScan;
 
 namespace wpfhikip.Discovery.Core
 {
@@ -51,27 +46,6 @@ namespace wpfhikip.Discovery.Core
         event EventHandler<DiscoveryProgressEventArgs> ProgressChanged;
     }
 
-    /// <summary>
-    /// Extended interface for discovery services that support real-time monitoring
-    /// </summary>
-    public interface IRealtimeDiscoveryService : INetworkDiscoveryService
-    {
-        /// <summary>
-        /// Starts continuous discovery monitoring
-        /// </summary>
-        /// <param name="cancellationToken">Cancellation token</param>
-        Task StartContinuousDiscoveryAsync(CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Stops continuous discovery monitoring
-        /// </summary>
-        Task StopContinuousDiscoveryAsync();
-
-        /// <summary>
-        /// Whether continuous discovery is currently running
-        /// </summary>
-        bool IsMonitoring { get; }
-    }
 
     /// <summary>
     /// Extended interface for discovery services that support port scanning

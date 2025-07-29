@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-using wpfhikip.Discovery.Models;
+﻿using wpfhikip.Discovery.Models;
 
 namespace wpfhikip.Discovery.Core
 {

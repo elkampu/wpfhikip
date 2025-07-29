@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
+﻿using System.Xml.Linq;
 
 using wpfhikip.Models;
 
@@ -96,31 +91,69 @@ namespace wpfhikip.Protocols.Hikvision
 
         private static string ModifyNetworkXml(string originalXml, Camera camera)
         {
-            var newValues = new Dictionary<string, string>();
-
-            if (!string.IsNullOrEmpty(camera.NewIP))
-                newValues["ipAddress"] = camera.NewIP;
-
-            if (!string.IsNullOrEmpty(camera.NewMask))
-                newValues["subnetMask"] = camera.NewMask;
-
-            if (!string.IsNullOrEmpty(camera.NewGateway))
+            try
             {
-                // Handle nested gateway structure
                 var doc = XDocument.Parse(originalXml);
-                var gatewayElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "DefaultGateway");
-                if (gatewayElement != null)
+                bool modified = false;
+
+                // Handle IP address
+                if (!string.IsNullOrEmpty(camera.NewIP))
                 {
-                    var ipElement = gatewayElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "ipAddress");
-                    if (ipElement != null)
+                    var ipElements = doc.Descendants().Where(e => e.Name.LocalName == "ipAddress" && e.Parent?.Name.LocalName != "DefaultGateway");
+                    foreach (var ipElement in ipElements)
                     {
-                        ipElement.Value = camera.NewGateway;
+                        if (!ipElement.HasElements)
+                        {
+                            ipElement.Value = camera.NewIP;
+                            modified = true;
+                        }
                     }
                 }
-                return doc.ToString();
-            }
 
-            return ModifyXmlTemplate(originalXml, newValues);
+                // Handle subnet mask
+                if (!string.IsNullOrEmpty(camera.NewMask))
+                {
+                    var maskElements = doc.Descendants().Where(e => e.Name.LocalName == "subnetMask");
+                    foreach (var maskElement in maskElements)
+                    {
+                        if (!maskElement.HasElements)
+                        {
+                            maskElement.Value = camera.NewMask;
+                            modified = true;
+                        }
+                    }
+                }
+
+                // Handle gateway (nested structure)
+                if (!string.IsNullOrEmpty(camera.NewGateway))
+                {
+                    var gatewayElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "DefaultGateway");
+                    if (gatewayElement != null)
+                    {
+                        var gatewayIpElement = gatewayElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "ipAddress");
+                        if (gatewayIpElement != null)
+                        {
+                            gatewayIpElement.Value = camera.NewGateway;
+                            modified = true;
+                        }
+                    }
+                }
+
+                return modified ? doc.ToString() : originalXml;
+            }
+            catch (Exception)
+            {
+                // Fallback to template-based approach
+                var newValues = new Dictionary<string, string>();
+
+                if (!string.IsNullOrEmpty(camera.NewIP))
+                    newValues["ipAddress"] = camera.NewIP;
+
+                if (!string.IsNullOrEmpty(camera.NewMask))
+                    newValues["subnetMask"] = camera.NewMask;
+
+                return ModifyXmlTemplate(originalXml, newValues);
+            }
         }
 
         private static string ModifyTimeXml(string originalXml, Camera camera)
@@ -182,10 +215,25 @@ namespace wpfhikip.Protocols.Hikvision
 
         private static bool HasNetworkConfigChanged(Dictionary<string, string> currentValues, Camera camera)
         {
-            return (currentValues.GetValueOrDefault("ipAddress") != camera.NewIP) ||
-                   (currentValues.GetValueOrDefault("subnetMask") != camera.NewMask) ||
-                   (!string.IsNullOrEmpty(camera.NewGateway) &&
-                    currentValues.GetValueOrDefault("ipAddress") != camera.NewGateway); // This may need adjustment for nested gateway
+            // Check if IP address changed
+            if (!string.IsNullOrEmpty(camera.NewIP) &&
+                currentValues.GetValueOrDefault("ipAddress") != camera.NewIP)
+                return true;
+
+            // Check if subnet mask changed
+            if (!string.IsNullOrEmpty(camera.NewMask) &&
+                currentValues.GetValueOrDefault("subnetMask") != camera.NewMask)
+                return true;
+
+            // Check if gateway changed - we need to handle this specially since gateway is nested
+            if (!string.IsNullOrEmpty(camera.NewGateway))
+            {
+                // For now, assume gateway changed if it's specified (since parsing nested gateway is complex)
+                // TODO: Parse nested gateway structure from currentValues to do proper comparison
+                return true;
+            }
+
+            return false;
         }
 
         private static bool HasNtpConfigChanged(Dictionary<string, string> currentValues, Camera camera)

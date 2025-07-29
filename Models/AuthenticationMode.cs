@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace wpfhikip.Models
+﻿namespace wpfhikip.Models
 {
     /// <summary>
     /// Represents the authentication modes available for connections.

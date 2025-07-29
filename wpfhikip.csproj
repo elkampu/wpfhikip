@@ -62,4 +62,8 @@
 	  <Folder Include="Properties\" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <PackageReference Include="SSDP.Portable" Version="1.0.31" />
+	</ItemGroup>
+
 </Project>

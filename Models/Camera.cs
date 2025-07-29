@@ -1,17 +1,10 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Concurrent;
 using System.Windows;
 using System.Windows.Media;
 
 namespace wpfhikip.Models
 {
-    public class Camera : INotifyPropertyChanged
+    public class Camera : BaseNotifyPropertyChanged
     {
         private bool _isSelected;
         private string? _manufacturer;
@@ -26,14 +19,18 @@ namespace wpfhikip.Models
         private FontWeight _cellFontWeight;
         private bool _isCompleted;
         private CameraProtocol _protocol;
+        private bool _isCompatible;
+        private bool _isAuthenticated;
+        private bool _requiresAuthentication;
+
         private readonly ConcurrentQueue<ProtocolLogEntry> _protocolLogs = new();
 
+        // Basic properties
         public CameraProtocol Protocol
         {
             get => _protocol;
             set => SetProperty(ref _protocol, value);
         }
-
         public string? Manufacturer
         {
             get => _manufacturer;
@@ -58,13 +55,57 @@ namespace wpfhikip.Models
             set => SetProperty(ref _serialNumber, value);
         }
 
-        public string? MACAddress
+        public string? MacAddress
         {
             get => _macAddress;
             set => SetProperty(ref _macAddress, value);
         }
 
-        // UI-related properties for DataGrid binding
+
+        /// <summary>
+        /// Indicates if the camera is compatible with any protocol
+        /// </summary>
+        public bool IsCompatible
+        {
+            get => _isCompatible;
+            set
+            {
+                if (SetProperty(ref _isCompatible, value))
+                    OnPropertyChanged(nameof(CanShowCameraInfo));
+            }
+        }
+
+        /// <summary>
+        /// Indicates if the camera requires authentication
+        /// </summary>
+        public bool RequiresAuthentication
+        {
+            get => _requiresAuthentication;
+            set
+            {
+                if (SetProperty(ref _requiresAuthentication, value))
+                    OnPropertyChanged(nameof(CanShowCameraInfo));
+            }
+        }
+
+        /// <summary>
+        /// Indicates if authentication was successful (only relevant if RequiresAuthentication is true)
+        /// </summary>
+        public bool IsAuthenticated
+        {
+            get => _isAuthenticated;
+            set
+            {
+                if (SetProperty(ref _isAuthenticated, value))
+                    OnPropertyChanged(nameof(CanShowCameraInfo));
+            }
+        }
+
+        /// <summary>
+        /// Computed property to determine if camera info button should be enabled
+        /// </summary>
+        public bool CanShowCameraInfo => IsCompatible && (!RequiresAuthentication || IsAuthenticated);
+        // UI-related properties
         public bool IsSelected
         {
             get => _isSelected;
@@ -76,33 +117,17 @@ namespace wpfhikip.Models
             get => _status;
             set
             {
-                SetProperty(ref _status, value);
-                OnPropertyChanged(nameof(ShortStatus));
+                if (SetProperty(ref _status, value))
+                    OnPropertyChanged(nameof(ShortStatus));
             }
         }
 
-        public string? ShortStatus
-        {
-            get
-            {
-                if (string.IsNullOrEmpty(_status))
-                    return _status;
+        // Optimized computed property
+        public string? ShortStatus => string.IsNullOrEmpty(_status) 
+            ? _status 
+            : _status.Length > 10 ? string.Concat(_status.AsSpan(0, 7), "...") : _status;
 
-                return _status.Length > 10 ? _status.Substring(0, 7) + "..." : _status;
-            }
-        }
 
-        public string? OnlineStatus
-        {
-            get => _onlineStatus;
-            set => SetProperty(ref _onlineStatus, value);
-        }
-
-        public Brush? RowColor
-        {
-            get => _rowColor;
-            set => SetProperty(ref _rowColor, value);
-        }
 
         public Brush? CellColor
         {
@@ -110,11 +135,6 @@ namespace wpfhikip.Models
             set => SetProperty(ref _cellColor, value);
         }
 
-        public FontWeight CellFontWeight
-        {
-            get => _cellFontWeight;
-            set => SetProperty(ref _cellFontWeight, value);
-        }
 
         public bool IsCompleted
         {
@@ -127,16 +147,16 @@ namespace wpfhikip.Models
         public CameraSettings Settings { get; set; } = new();
         public CameraVideoStream VideoStream { get; set; } = new();
 
-        // Protocol logs for real-time monitoring
+        // Protocol logs
         public ConcurrentQueue<ProtocolLogEntry> ProtocolLogs => _protocolLogs;
 
-        // Helper properties for easier access to connection settings
+        // Helper properties with optimized implementations
         public string? CurrentIP
         {
             get => Connection.IPAddress;
             set
             {
-                if (Connection.IPAddress != value)
+                if (!string.Equals(Connection.IPAddress, value, StringComparison.Ordinal))
                 {
                     Connection.IPAddress = value;
                     OnPropertyChanged();
@@ -149,10 +169,11 @@ namespace wpfhikip.Models
             get => Connection.Port;
             set
             {
-                if (Connection.Port != value)
+                if (!string.Equals(Connection.Port, value, StringComparison.Ordinal))
                 {
                     Connection.Port = value;
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(EffectivePort));
                 }
             }
         }
@@ -162,7 +183,7 @@ namespace wpfhikip.Models
             get => Connection.Username;
             set
             {
-                if (Connection.Username != value)
+                if (!string.Equals(Connection.Username, value, StringComparison.Ordinal))
                 {
                     Connection.Username = value;
                     OnPropertyChanged();
@@ -175,7 +196,7 @@ namespace wpfhikip.Models
             get => Connection.Password;
             set
             {
-                if (Connection.Password != value)
+                if (!string.Equals(Connection.Password, value, StringComparison.Ordinal))
                 {
                     Connection.Password = value;
                     OnPropertyChanged();
@@ -183,13 +204,13 @@ namespace wpfhikip.Models
             }
         }
 
-        // Helper properties for easier access to settings
+        // Settings helper properties
         public string? NewIP
         {
             get => Settings.IPAddress;
             set
             {
-                if (Settings.IPAddress != value)
+                if (!string.Equals(Settings.IPAddress, value, StringComparison.Ordinal))
                 {
                     Settings.IPAddress = value;
                     OnPropertyChanged();
@@ -202,7 +223,7 @@ namespace wpfhikip.Models
             get => Settings.SubnetMask;
             set
             {
-                if (Settings.SubnetMask != value)
+                if (!string.Equals(Settings.SubnetMask, value, StringComparison.Ordinal))
                 {
                     Settings.SubnetMask = value;
                     OnPropertyChanged();
@@ -215,7 +236,7 @@ namespace wpfhikip.Models
             get => Settings.DefaultGateway;
             set
             {
-                if (Settings.DefaultGateway != value)
+                if (!string.Equals(Settings.DefaultGateway, value, StringComparison.Ordinal))
                 {
                     Settings.DefaultGateway = value;
                     OnPropertyChanged();
@@ -228,7 +249,7 @@ namespace wpfhikip.Models
             get => Settings.NTPServer;
             set
             {
-                if (Settings.NTPServer != value)
+                if (!string.Equals(Settings.NTPServer, value, StringComparison.Ordinal))
                 {
                     Settings.NTPServer = value;
                     OnPropertyChanged();
@@ -238,38 +259,19 @@ namespace wpfhikip.Models
 
         /// <summary>
         /// Gets the effective port to use for connections.
-        /// Returns the custom port if specified, otherwise returns the default port for the protocol.
         /// </summary>
         public int EffectivePort
         {
             get
             {
-                // If custom port is specified and valid, use it
-                if (!string.IsNullOrEmpty(Port) && int.TryParse(Port, out int port) && port > 0 && port <= 65535)
+                if (!string.IsNullOrEmpty(Port) &&
+                    int.TryParse(Port, out int port) &&
+                    port is > 0 and <= 65535)
                 {
                     return port;
                 }
-
-                // Return default port based on protocol
-                return GetDefaultPortForProtocol(Protocol);
+                return ProtocolDefaults.GetDefaultPort(Protocol);
             }
-        }
-
-        /// <summary>
-        /// Gets the default port for a specific camera protocol
-        /// </summary>
-        private static int GetDefaultPortForProtocol(CameraProtocol protocol)
-        {
-            return protocol switch
-            {
-                CameraProtocol.Hikvision => 80,
-                CameraProtocol.Dahua => 80,
-                CameraProtocol.Axis => 80,
-                CameraProtocol.Onvif => 80,
-                CameraProtocol.Bosch => 80,
-                CameraProtocol.Hanwha => 80,
-                _ => 80 // Default HTTP port
-            };
         }
 
         /// <summary>
@@ -307,37 +309,20 @@ namespace wpfhikip.Models
             while (_protocolLogs.TryDequeue(out _)) { }
             OnPropertyChanged(nameof(ProtocolLogs));
         }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-        {
-            if (EqualityComparer<T>.Default.Equals(field, value))
-                return false;
-
-            field = value;
-            OnPropertyChanged(propertyName);
-            return true;
-        }
     }
 
     /// <summary>
     /// Represents a single protocol checking log entry
     /// </summary>
-    public class ProtocolLogEntry
+    public sealed record ProtocolLogEntry
     {
-        public DateTime Timestamp { get; set; }
-        public string Protocol { get; set; } = string.Empty;
-        public string Step { get; set; } = string.Empty;
-        public string Details { get; set; } = string.Empty;
-        public ProtocolLogLevel Level { get; set; }
-        public string IpAddress { get; set; } = string.Empty;
-        public int Port { get; set; }
+        public DateTime Timestamp { get; init; }
+        public string Protocol { get; init; } = string.Empty;
+        public string Step { get; init; } = string.Empty;
+        public string Details { get; init; } = string.Empty;
+        public ProtocolLogLevel Level { get; init; }
+        public string IpAddress { get; init; } = string.Empty;
+        public int Port { get; init; }
 
         public string FormattedTimestamp => Timestamp.ToString("HH:mm:ss.fff");
 

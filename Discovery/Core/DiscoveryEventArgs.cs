@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace wpfhikip.Discovery.Core
+﻿namespace wpfhikip.Discovery.Core
 {
     /// <summary>
     /// Event arguments for when a device is discovered

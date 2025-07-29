@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
+﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Threading.Tasks;
 
 namespace wpfhikip.Discovery.Core
 {
@@ -13,6 +9,10 @@ namespace wpfhikip.Discovery.Core
     /// </summary>
     public static class NetworkUtils
     {
+        // Cache frequently used calculations to avoid repeated work
+        private static readonly Dictionary<IPAddress, int> s_prefixLengthCache = new();
+        private static readonly object s_cacheLock = new();
+
         /// <summary>
         /// Gets all local network interfaces with their IP addresses and subnets
         /// </summary>
@@ -53,7 +53,7 @@ namespace wpfhikip.Discovery.Core
                     }
                 }
 
-                if (interfaceInfo.IPv4Addresses.Any())
+                if (interfaceInfo.IPv4Addresses.Count > 0)
                 {
                     interfaces[networkInterface.Id] = interfaceInfo;
                 }
@@ -90,28 +90,30 @@ namespace wpfhikip.Discovery.Core
         /// <returns>List of IP addresses in the segment</returns>
         public static List<IPAddress> GetIPAddressesInSegment(string networkSegment)
         {
-            var addresses = new List<IPAddress>();
-
             if (!TryParseCidr(networkSegment, out var networkAddress, out var prefixLength))
-                return addresses;
+                return new List<IPAddress>();
 
+            var totalHosts = Math.Min((int)Math.Pow(2, 32 - prefixLength) - 2, 65534); // Reasonable limit
+            if (totalHosts <= 0)
+                return new List<IPAddress>();
+
+            var addresses = new List<IPAddress>(totalHosts);
             var networkBytes = networkAddress.GetAddressBytes();
-            var totalHosts = (int)Math.Pow(2, 32 - prefixLength) - 2; // Exclude network and broadcast
 
-            if (totalHosts <= 0 || totalHosts > 65534) // Reasonable limit
-                return addresses;
+            // Pre-allocate buffer outside loop to fix CA2014 warning
+            var addressBytes = new byte[4];
 
             for (int i = 1; i <= totalHosts; i++)
             {
-                var hostBytes = BitConverter.GetBytes(i);
-                if (BitConverter.IsLittleEndian)
-                    Array.Reverse(hostBytes);
+                // Copy network bytes to address bytes
+                Array.Copy(networkBytes, addressBytes, 4);
 
-                var addressBytes = new byte[4];
-                for (int j = 0; j < 4; j++)
-                {
-                    addressBytes[j] = (byte)(networkBytes[j] | hostBytes[j]);
-                }
+                // Add host part using bit manipulation
+                var hostValue = (uint)i;
+                addressBytes[3] = (byte)(addressBytes[3] | (hostValue & 0xFF));
+                addressBytes[2] = (byte)(addressBytes[2] | ((hostValue >> 8) & 0xFF));
+                addressBytes[1] = (byte)(addressBytes[1] | ((hostValue >> 16) & 0xFF));
+                addressBytes[0] = (byte)(addressBytes[0] | ((hostValue >> 24) & 0xFF));
 
                 addresses.Add(new IPAddress(addressBytes));
             }
@@ -130,8 +132,8 @@ namespace wpfhikip.Discovery.Core
             if (!TryParseCidr(networkSegment, out var networkAddress, out var prefixLength))
                 return false;
 
-            var ipBytes = ipAddress.GetAddressBytes();
-            var networkBytes = networkAddress.GetAddressBytes();
+            ReadOnlySpan<byte> ipBytes = ipAddress.GetAddressBytes();
+            ReadOnlySpan<byte> networkBytes = networkAddress.GetAddressBytes();
             var bitsToCheck = prefixLength;
 
             for (int i = 0; i < 4 && bitsToCheck > 0; i++)
@@ -187,9 +189,41 @@ namespace wpfhikip.Discovery.Core
         /// </summary>
         public static int GetPrefixLength(IPAddress subnetMask)
         {
-            var maskBytes = subnetMask.GetAddressBytes();
-            var binaryString = string.Join("", maskBytes.Select(b => Convert.ToString(b, 2).PadLeft(8, '0')));
-            return binaryString.TakeWhile(c => c == '1').Count();
+            // Check cache first
+            lock (s_cacheLock)
+            {
+                if (s_prefixLengthCache.TryGetValue(subnetMask, out int cachedResult))
+                {
+                    return cachedResult;
+                }
+            }
+
+            ReadOnlySpan<byte> maskBytes = subnetMask.GetAddressBytes();
+            var prefixLength = 0;
+
+            for (int i = 0; i < 4; i++)
+            {
+                var b = maskBytes[i];
+                while (b > 0)
+                {
+                    if ((b & 0x80) != 0)
+                        prefixLength++;
+                    else
+                        break;
+                    b <<= 1;
+                }
+                
+                if (b > 0) // Found a gap, stop counting
+                    break;
+            }
+
+            // Cache the result
+            lock (s_cacheLock)
+            {
+                s_prefixLengthCache.TryAdd(subnetMask, prefixLength);
+            }
+
+            return prefixLength;
         }
 
         /// <summary>
@@ -197,11 +231,18 @@ namespace wpfhikip.Discovery.Core
         /// </summary>
         public static IPAddress GetSubnetMask(int prefixLength)
         {
-            if (prefixLength < 0 || prefixLength > 32)
+            if (prefixLength is < 0 or > 32)
                 throw new ArgumentException("Prefix length must be between 0 and 32", nameof(prefixLength));
 
             uint mask = prefixLength == 0 ? 0 : 0xFFFFFFFF << (32 - prefixLength);
-            return new IPAddress(BitConverter.GetBytes(IPAddress.HostToNetworkOrder((int)mask)));
+            var bytes = new byte[4];
+            
+            bytes[0] = (byte)((mask >> 24) & 0xFF);
+            bytes[1] = (byte)((mask >> 16) & 0xFF);
+            bytes[2] = (byte)((mask >> 8) & 0xFF);
+            bytes[3] = (byte)(mask & 0xFF);
+            
+            return new IPAddress(bytes);
         }
 
         /// <summary>
@@ -215,14 +256,15 @@ namespace wpfhikip.Discovery.Core
             if (string.IsNullOrEmpty(cidr))
                 return false;
 
-            var parts = cidr.Split('/');
-            if (parts.Length != 2)
+            var separatorIndex = cidr.IndexOf('/');
+            if (separatorIndex <= 0 || separatorIndex == cidr.Length - 1)
                 return false;
 
-            if (!IPAddress.TryParse(parts[0], out networkAddress))
+            if (!IPAddress.TryParse(cidr.AsSpan(0, separatorIndex), out networkAddress))
                 return false;
 
-            if (!int.TryParse(parts[1], out prefixLength) || prefixLength < 0 || prefixLength > 32)
+            if (!int.TryParse(cidr.AsSpan(separatorIndex + 1), out prefixLength) || 
+                prefixLength is < 0 or > 32)
                 return false;
 
             return true;
@@ -236,7 +278,7 @@ namespace wpfhikip.Discovery.Core
             try
             {
                 using var ping = new Ping();
-                var reply = await ping.SendPingAsync(ipAddress, (int)timeout.TotalMilliseconds);
+                var reply = await ping.SendPingAsync(ipAddress, (int)timeout.TotalMilliseconds).ConfigureAwait(false);
                 return reply.Status == IPStatus.Success;
             }
             catch
@@ -256,12 +298,12 @@ namespace wpfhikip.Discovery.Core
                 var connectTask = tcpClient.ConnectAsync(ipAddress, port);
                 var timeoutTask = Task.Delay(timeout);
 
-                var completedTask = await Task.WhenAny(connectTask, timeoutTask);
+                var completedTask = await Task.WhenAny(connectTask, timeoutTask).ConfigureAwait(false);
 
                 if (completedTask == timeoutTask)
                     return false;
 
-                await connectTask; // Ensure we handle any exceptions
+                await connectTask.ConfigureAwait(false); // Ensure we handle any exceptions
                 return tcpClient.Connected;
             }
             catch
@@ -277,7 +319,7 @@ namespace wpfhikip.Discovery.Core
         {
             try
             {
-                var hostEntry = await Dns.GetHostEntryAsync(ipAddress);
+                var hostEntry = await Dns.GetHostEntryAsync(ipAddress).ConfigureAwait(false);
                 return hostEntry.HostName;
             }
             catch

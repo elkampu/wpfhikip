@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Text;
-using System.Threading.Tasks;
-
-using wpfhikip.Models;
 
 namespace wpfhikip.Protocols.Hikvision
 {
@@ -123,6 +117,64 @@ namespace wpfhikip.Protocols.Hikvision
             catch (Exception ex)
             {
                 return (false, new Dictionary<string, string>(), $"Error getting camera status: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Gets streaming channel information
+        /// </summary>
+        public async Task<(bool Success, Dictionary<string, string> StreamingInfo, string ErrorMessage)> GetStreamingChannelInfoAsync(int channel = 1)
+        {
+            try
+            {
+                EnsureHttpClient();
+
+                var url = $"{GetBaseUrl()}/ISAPI/Streaming/channels/{channel}01";
+                var response = await _httpClient!.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var xmlContent = await response.Content.ReadAsStringAsync();
+                    var streamingInfo = HikvisionXmlTemplates.ParseResponseXml(xmlContent);
+                    return (true, streamingInfo, string.Empty);
+                }
+                else
+                {
+                    return (false, new Dictionary<string, string>(), $"Failed to get streaming info: {response.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                return (false, new Dictionary<string, string>(), $"Error getting streaming info: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Gets video input channel capabilities
+        /// </summary>
+        public async Task<(bool Success, Dictionary<string, string> VideoInputInfo, string ErrorMessage)> GetVideoInputChannelInfoAsync(int channel = 1)
+        {
+            try
+            {
+                EnsureHttpClient();
+
+                var url = $"{GetBaseUrl()}/ISAPI/System/Video/inputs/channels/{channel}";
+                var response = await _httpClient!.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var xmlContent = await response.Content.ReadAsStringAsync();
+                    var videoInputInfo = HikvisionXmlTemplates.ParseResponseXml(xmlContent);
+                    return (true, videoInputInfo, string.Empty);
+                }
+                else
+                {
+                    return (false, new Dictionary<string, string>(), $"Failed to get video input info: {response.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                return (false, new Dictionary<string, string>(), $"Error getting video input info: {ex.Message}");
             }
         }
 

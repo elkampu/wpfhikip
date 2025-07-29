@@ -1,26 +1,26 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
+﻿using System.Net;
 using System.Net.Http;
 using System.Text;
-using System.Threading.Tasks;
 
 using wpfhikip.Models;
+using wpfhikip.Protocols.Common;
 
 namespace wpfhikip.Protocols.Onvif
 {
-    public class OnvifConnection : IDisposable
+    public sealed class OnvifConnection : IProtocolConnection
     {
+        private const int HttpTimeoutSeconds = 5;
+
+        private HttpClient? _httpClient;
+        private bool _disposed;
+        private string? _deviceServiceUrl;
+
         public string IpAddress { get; set; }
         public int Port { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }
         public AuthenticationMode AuthenticationMode { get; set; } = AuthenticationMode.WSUsernameToken;
-
-        private HttpClient? _httpClient;
-        private bool _disposed = false;
-        private string? _deviceServiceUrl;
+        public CameraProtocol ProtocolType => CameraProtocol.Onvif;
 
         public OnvifConnection(string ipAddress, int port, string username, string password)
         {
@@ -31,118 +31,70 @@ namespace wpfhikip.Protocols.Onvif
         }
 
         public OnvifConnection(string ipAddress, int port, string username, string password, AuthenticationMode authMode)
+            : this(ipAddress, port, username, password)
         {
-            IpAddress = ipAddress;
-            Port = port;
-            Username = username;
-            Password = password;
             AuthenticationMode = authMode;
         }
 
-        /// <summary>
-        /// Checks if the camera is ONVIF compatible by attempting to access ONVIF device services
-        /// </summary>
-        /// <returns>
-        /// CompatibilityResult containing success status, whether it's ONVIF compatible, 
-        /// authentication status, and any error messages
-        /// </returns>
-        public async Task<CompatibilityResult> CheckCompatibilityAsync()
+        public async Task<ProtocolCompatibilityResult> CheckCompatibilityAsync(CancellationToken cancellationToken = default)
         {
             try
             {
                 InitializeHttpClient();
 
-                // Try to find ONVIF device service on common ports and paths
                 var deviceServiceFound = await DiscoverDeviceServiceAsync();
-
                 if (!deviceServiceFound)
                 {
-                    return new CompatibilityResult
-                    {
-                        Success = true,
-                        IsOnvifCompatible = false,
-                        Message = OnvifStatusMessages.DeviceNotFound
-                    };
+                    return ProtocolCompatibilityResult.CreateFailure("ONVIF device service not found");
                 }
 
-                var result = new CompatibilityResult();
-
-                // Try to get device information without authentication first
                 var deviceInfoRequest = OnvifSoapTemplates.CreateGetDeviceInformationRequest();
-                var response = await SendSoapRequestAsync(_deviceServiceUrl, deviceInfoRequest);
+                var response = await SendSoapRequestAsync(_deviceServiceUrl!, deviceInfoRequest);
 
                 if (response.Success)
                 {
                     if (OnvifSoapTemplates.ValidateOnvifResponse(response.Content))
                     {
-                        result.IsOnvifCompatible = true;
-                        result.RequiresAuthentication = false;
-                        result.IsAuthenticated = true;
-                        result.Success = true;
-                        result.Message = "ONVIF device detected - no authentication required";
+                        return ProtocolCompatibilityResult.CreateSuccess(
+                            CameraProtocol.Onvif,
+                            requiresAuth: false,
+                            isAuthenticated: true);
                     }
-                    else
-                    {
-                        result.IsOnvifCompatible = false;
-                        result.Success = true;
-                        result.Message = "Device responds but is not ONVIF compatible";
-                    }
-                }
-                else if (response.StatusCode == HttpStatusCode.Unauthorized || OnvifSoapTemplates.IsSoapFault(response.Content))
-                {
-                    // Try with authentication
-                    result.IsOnvifCompatible = true;
-                    result.RequiresAuthentication = true;
-                    result.Success = true;
-                    result.Message = "ONVIF device detected - authentication required";
 
+                    return ProtocolCompatibilityResult.CreateFailure("Device responds but is not ONVIF compatible");
+                }
+
+                if (response.StatusCode == HttpStatusCode.Unauthorized || OnvifSoapTemplates.IsSoapFault(response.Content))
+                {
                     var authResult = await TestAuthenticationAsync();
-                    result.IsAuthenticated = authResult.IsAuthenticated;
-                    result.AuthenticationMessage = authResult.Message;
-                }
-                else
-                {
-                    result.IsOnvifCompatible = false;
-                    result.Success = false;
-                    result.Message = $"Unexpected response: {response.StatusCode}";
+                    return ProtocolCompatibilityResult.CreateSuccess(
+                        CameraProtocol.Onvif,
+                        requiresAuth: true,
+                        isAuthenticated: authResult.IsAuthenticated,
+                        authMessage: authResult.Message);
                 }
 
-                return result;
+                return ProtocolCompatibilityResult.CreateFailure($"Unexpected response: {response.StatusCode}");
             }
             catch (HttpRequestException ex)
             {
-                return new CompatibilityResult
-                {
-                    Success = false,
-                    IsOnvifCompatible = false,
-                    Message = $"Network error: {ex.Message}"
-                };
+                return ProtocolCompatibilityResult.CreateFailure($"Network error: {ex.Message}");
             }
-            catch (TaskCanceledException ex)
+            catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
             {
-                return new CompatibilityResult
-                {
-                    Success = false,
-                    IsOnvifCompatible = false,
-                    Message = ex.InnerException is TimeoutException ? "Connection timeout" : "Request cancelled"
-                };
+                return ProtocolCompatibilityResult.CreateFailure("Connection timeout");
+            }
+            catch (TaskCanceledException)
+            {
+                return ProtocolCompatibilityResult.CreateFailure("Request cancelled");
             }
             catch (Exception ex)
             {
-                return new CompatibilityResult
-                {
-                    Success = false,
-                    IsOnvifCompatible = false,
-                    Message = $"Error checking compatibility: {ex.Message}"
-                };
+                return ProtocolCompatibilityResult.CreateFailure($"Error checking compatibility: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// Tests authentication with the provided credentials
-        /// </summary>
-        /// <returns>Authentication result</returns>
-        public async Task<AuthenticationResult> TestAuthenticationAsync()
+        public async Task<AuthenticationResult> TestAuthenticationAsync(CancellationToken cancellationToken = default)
         {
             try
             {
@@ -151,191 +103,66 @@ namespace wpfhikip.Protocols.Onvif
                     var found = await DiscoverDeviceServiceAsync();
                     if (!found)
                     {
-                        return new AuthenticationResult
-                        {
-                            IsAuthenticated = false,
-                            Success = false,
-                            Message = "Device service not found"
-                        };
+                        return AuthenticationResult.CreateError("Device service not found");
                     }
                 }
 
                 var deviceInfoRequest = OnvifSoapTemplates.CreateGetDeviceInformationRequest(Username, Password);
-                var response = await SendSoapRequestAsync(_deviceServiceUrl, deviceInfoRequest);
+                var response = await SendSoapRequestAsync(_deviceServiceUrl!, deviceInfoRequest);
 
                 if (response.Success && OnvifSoapTemplates.ValidateOnvifResponse(response.Content))
                 {
-                    return new AuthenticationResult
-                    {
-                        IsAuthenticated = true,
-                        Success = true,
-                        Message = "Authentication successful"
-                    };
+                    return AuthenticationResult.CreateSuccess();
                 }
-                else if (OnvifSoapTemplates.IsSoapFault(response.Content))
+
+                if (OnvifSoapTemplates.IsSoapFault(response.Content))
                 {
-                    return new AuthenticationResult
-                    {
-                        IsAuthenticated = false,
-                        Success = true,
-                        Message = "Authentication failed - invalid credentials"
-                    };
+                    return AuthenticationResult.CreateFailure("Authentication failed - invalid credentials");
                 }
-                else
-                {
-                    return new AuthenticationResult
-                    {
-                        IsAuthenticated = false,
-                        Success = false,
-                        Message = $"Unexpected response during authentication: {response.StatusCode}"
-                    };
-                }
+
+                return AuthenticationResult.CreateError($"Unexpected response during authentication: {response.StatusCode}");
             }
             catch (Exception ex)
             {
-                return new AuthenticationResult
-                {
-                    IsAuthenticated = false,
-                    Success = false,
-                    Message = $"Error during authentication: {ex.Message}"
-                };
+                return AuthenticationResult.CreateError($"Error during authentication: {ex.Message}");
             }
         }
-        // Add these methods to OnvifConnection class:
 
-        /// <summary>
-        /// Sends network configuration to the ONVIF device using Camera object
-        /// </summary>
-        /// <param name="camera">Camera object containing configuration</param>
-        /// <returns>Operation result</returns>
-        public async Task<OnvifOperationResult> SendNetworkConfigurationAsync(Camera camera)
+        public async Task<bool> SendNetworkConfigAsync(NetworkConfiguration config, CancellationToken cancellationToken = default)
         {
+            ArgumentNullException.ThrowIfNull(config);
+
+            if (!config.IsValid)
+                return false;
+
             try
             {
                 if (string.IsNullOrEmpty(_deviceServiceUrl))
                 {
                     var found = await DiscoverDeviceServiceAsync();
-                    if (!found)
-                    {
-                        return new OnvifOperationResult
-                        {
-                            Success = false,
-                            Message = "Device service not found"
-                        };
-                    }
+                    if (!found) return false;
                 }
 
-                // First, get current network interfaces to get the interface token
+                // Get current network interfaces
                 var getNetworkRequest = OnvifSoapTemplates.CreateGetNetworkInterfacesRequest(Username, Password);
-                var getResponse = await SendSoapRequestAsync(_deviceServiceUrl, getNetworkRequest);
+                var getResponse = await SendSoapRequestAsync(_deviceServiceUrl!, getNetworkRequest);
 
-                if (!getResponse.Success)
-                {
-                    return new OnvifOperationResult
-                    {
-                        Success = false,
-                        Message = "Failed to retrieve current network configuration"
-                    };
-                }
+                if (!getResponse.Success) return false;
 
                 var interfaceToken = OnvifSoapTemplates.ExtractNetworkInterfaceToken(getResponse.Content);
 
-                // Now set the new network configuration using Camera object
-                var setNetworkRequest = OnvifSoapTemplates.CreateSetNetworkInterfacesRequest(camera, interfaceToken, Username, Password);
-                var setResponse = await SendSoapRequestAsync(_deviceServiceUrl, setNetworkRequest);
-
-                if (setResponse.Success && !OnvifSoapTemplates.IsSoapFault(setResponse.Content))
+                // Create temporary Camera object for existing API compatibility
+                var tempCamera = new Camera
                 {
-                    return new OnvifOperationResult
-                    {
-                        Success = true,
-                        Message = OnvifStatusMessages.NetworkSettingsSent
-                    };
-                }
-                else
-                {
-                    return new OnvifOperationResult
-                    {
-                        Success = false,
-                        Message = OnvifSoapTemplates.IsSoapFault(setResponse.Content)
-                            ? OnvifStatusMessages.SoapFault
-                            : $"Failed to send network configuration: {setResponse.StatusCode}"
-                    };
-                }
-            }
-            catch (Exception ex)
-            {
-                return new OnvifOperationResult
-                {
-                    Success = false,
-                    Message = $"Error sending network configuration: {ex.Message}"
+                    NewIP = config.IPAddress,
+                    NewMask = config.SubnetMask,
+                    NewGateway = config.DefaultGateway
                 };
-            }
-        }
 
-        /// <summary>
-        /// Sends NTP configuration to the ONVIF device using Camera object
-        /// </summary>
-        /// <param name="camera">Camera object containing NTP settings</param>
-        /// <returns>Operation result</returns>
-        public async Task<OnvifOperationResult> SendNtpConfigurationAsync(Camera camera)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(_deviceServiceUrl))
-                {
-                    var found = await DiscoverDeviceServiceAsync();
-                    if (!found)
-                    {
-                        return new OnvifOperationResult
-                        {
-                            Success = false,
-                            Message = "Device service not found"
-                        };
-                    }
-                }
+                var setNetworkRequest = OnvifSoapTemplates.CreateSetNetworkInterfacesRequest(tempCamera, interfaceToken, Username, Password);
+                var setResponse = await SendSoapRequestAsync(_deviceServiceUrl!, setNetworkRequest);
 
-                var setNtpRequest = OnvifSoapTemplates.CreateSetNtpRequest(camera, Username, Password);
-                var response = await SendSoapRequestAsync(_deviceServiceUrl, setNtpRequest);
-
-                if (response.Success && !OnvifSoapTemplates.IsSoapFault(response.Content))
-                {
-                    return new OnvifOperationResult
-                    {
-                        Success = true,
-                        Message = OnvifStatusMessages.NtpServerSent
-                    };
-                }
-                else
-                {
-                    return new OnvifOperationResult
-                    {
-                        Success = false,
-                        Message = OnvifSoapTemplates.IsSoapFault(response.Content)
-                            ? OnvifStatusMessages.SoapFault
-                            : OnvifStatusMessages.NtpServerError
-                    };
-                }
-            }
-            catch (Exception ex)
-            {
-                return new OnvifOperationResult
-                {
-                    Success = false,
-                    Message = $"Error sending NTP configuration: {ex.Message}"
-                };
-            }
-        }
-        /// <summary>
-        /// Synchronous version of CheckCompatibilityAsync for UI compatibility
-        /// </summary>
-        /// <returns>True if compatible, false otherwise</returns>
-        public bool CheckCompatibility()
-        {
-            try
-            {
-                var result = CheckCompatibilityAsync().GetAwaiter().GetResult();
-                return result.IsOnvifCompatible;
+                return setResponse.Success && !OnvifSoapTemplates.IsSoapFault(setResponse.Content);
             }
             catch
             {
@@ -343,51 +170,72 @@ namespace wpfhikip.Protocols.Onvif
             }
         }
 
-        /// <summary>
-        /// Discovers ONVIF device service URL by trying common endpoints and ports
-        /// </summary>
+        public async Task<bool> SendNTPConfigAsync(NTPConfiguration config, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+
+            if (!config.IsValid)
+                return false;
+
+            try
+            {
+                if (string.IsNullOrEmpty(_deviceServiceUrl))
+                {
+                    var found = await DiscoverDeviceServiceAsync();
+                    if (!found) return false;
+                }
+
+                // Create temporary Camera object for existing API compatibility
+                var tempCamera = new Camera
+                {
+                    NewNTPServer = config.NTPServer
+                };
+
+                var setNtpRequest = OnvifSoapTemplates.CreateSetNtpRequest(tempCamera, Username, Password);
+                var response = await SendSoapRequestAsync(_deviceServiceUrl!, setNtpRequest);
+
+                return response.Success && !OnvifSoapTemplates.IsSoapFault(response.Content);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private async Task<bool> DiscoverDeviceServiceAsync()
         {
-            var ports = OnvifUrl.UrlBuilders.GetCommonOnvifPorts();
+            // Use only the user-defined port instead of scanning all common ports
+            var urls = OnvifUrl.UrlBuilders.GetPossibleDeviceServiceUrls(IpAddress, Port);
 
-            foreach (var port in ports)
+            foreach (var url in urls)
             {
-                var urls = OnvifUrl.UrlBuilders.GetPossibleDeviceServiceUrls(IpAddress, port);
-
-                foreach (var url in urls)
+                try
                 {
-                    try
-                    {
-                        var testRequest = OnvifSoapTemplates.CreateGetDeviceInformationRequest();
-                        var response = await SendSoapRequestAsync(url, testRequest);
+                    var testRequest = OnvifSoapTemplates.CreateGetDeviceInformationRequest();
+                    var response = await SendSoapRequestAsync(url, testRequest).ConfigureAwait(false);
 
-                        if (response.Success || OnvifSoapTemplates.IsSoapFault(response.Content))
-                        {
-                            _deviceServiceUrl = url;
-                            Port = port; // Update the port if we found it on a different one
-                            return true;
-                        }
-                    }
-                    catch
+                    if (response.Success || OnvifSoapTemplates.IsSoapFault(response.Content))
                     {
-                        // Continue trying other URLs
+                        _deviceServiceUrl = url;
+                        return true;
                     }
+                }
+                catch
+                {
+                    // Continue trying other URLs on the same port
                 }
             }
 
             return false;
         }
 
-        /// <summary>
-        /// Sends SOAP request to the specified URL
-        /// </summary>
         private async Task<(bool Success, string Content, HttpStatusCode StatusCode)> SendSoapRequestAsync(string url, string soapRequest)
         {
             try
             {
                 var content = new StringContent(soapRequest, Encoding.UTF8, OnvifContentTypes.Soap);
-                var response = await _httpClient.PostAsync(url, content);
-                var responseContent = await response.Content.ReadAsStringAsync();
+                var response = await _httpClient!.PostAsync(url, content).ConfigureAwait(false);
+                var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                 return (response.IsSuccessStatusCode, responseContent, response.StatusCode);
             }
@@ -399,75 +247,22 @@ namespace wpfhikip.Protocols.Onvif
 
         private void InitializeHttpClient()
         {
-            if (_httpClient != null)
-                return;
+            if (_httpClient != null) return;
 
-            var handler = new HttpClientHandler();
-            _httpClient = new HttpClient(handler)
+            _httpClient = new HttpClient(new HttpClientHandler())
             {
-                Timeout = TimeSpan.FromSeconds(10) // 10 second timeout for compatibility checks
+                Timeout = TimeSpan.FromSeconds(HttpTimeoutSeconds)
             };
-
-            // Add common headers for ONVIF
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "OnvifCompatibilityChecker/1.0");
-        }
-
-        private string BuildBaseUrl()
-        {
-            var portSuffix = Port != 80 && Port != 443 ? $":{Port}" : "";
-            var protocol = Port == 443 ? "https" : "http";
-            return $"{protocol}://{IpAddress}{portSuffix}";
         }
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
             if (!_disposed)
             {
-                if (disposing)
-                {
-                    _httpClient?.Dispose();
-                }
+                _httpClient?.Dispose();
                 _disposed = true;
             }
         }
-    }
-
-    /// <summary>
-    /// Result of ONVIF operation
-    /// </summary>
-    public class OnvifOperationResult
-    {
-        public bool Success { get; set; }
-        public string Message { get; set; } = string.Empty;
-        public Dictionary<string, string>? Data { get; set; }
-    }
-
-    /// <summary>
-    /// Extended compatibility result for ONVIF devices
-    /// </summary>
-    public class CompatibilityResult
-    {
-        public bool Success { get; set; }
-        public bool IsOnvifCompatible { get; set; }
-        public bool RequiresAuthentication { get; set; }
-        public bool IsAuthenticated { get; set; }
-        public string Message { get; set; } = string.Empty;
-        public string AuthenticationMessage { get; set; } = string.Empty;
-    }
-
-    /// <summary>
-    /// Result of authentication test
-    /// </summary>
-    public class AuthenticationResult
-    {
-        public bool Success { get; set; }
-        public bool IsAuthenticated { get; set; }
-        public string Message { get; set; } = string.Empty;
     }
 }

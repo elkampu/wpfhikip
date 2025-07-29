@@ -3,7 +3,7 @@
             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"  
             xmlns:local="clr-namespace:wpfhikip"
              xmlns:converters="clr-namespace:wpfhikip.Converters"
-             StartupUri="Views/NetConfView.xaml">
+             StartupUri="MainWindowV2.xaml">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>

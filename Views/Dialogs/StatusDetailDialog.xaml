@@ -3,20 +3,27 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:converters="clr-namespace:wpfhikip.Converters"
         mc:Ignorable="d"
-        Title="Protocol Status Monitor"
-        Height="500"
-        Width="600"
+        Title="{Binding WindowTitle}"
+        Height="700"
+        Width="800"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
-        Background="#FF2D2D30"
-        MinHeight="400"
-        MinWidth="500">
+        Background="{StaticResource SEC_LightBlue}"
+        MinHeight="600"
+        MinWidth="700">
     <Window.Resources>
+
+        <converters:EnumToStringConverter x:Key="EnumToStringConverter" />
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
+        <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+
         <Style x:Key="ModernTextBlockStyle"
                TargetType="TextBlock">
             <Setter Property="Foreground"
-                    Value="White" />
+                    Value="{StaticResource SEC_DarkGrey}" />
             <Setter Property="FontFamily"
                     Value="Segoe UI" />
             <Setter Property="FontSize"
@@ -27,9 +34,26 @@
                TargetType="TextBlock"
                BasedOn="{StaticResource ModernTextBlockStyle}">
             <Setter Property="FontSize"
-                    Value="16" />
+                    Value="18" />
             <Setter Property="FontWeight"
                     Value="Bold" />
+            <Setter Property="Margin"
+                    Value="0,0,0,15" />
+            <Setter Property="Foreground"
+                    Value="{StaticResource SEC_NavyBlue}" />
+        </Style>
+
+        <Style x:Key="SectionHeaderStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource ModernTextBlockStyle}">
+            <Setter Property="FontSize"
+                    Value="14" />
+            <Setter Property="FontWeight"
+                    Value="Bold" />
+            <Setter Property="Margin"
+                    Value="0,0,0,10" />
+            <Setter Property="Foreground"
+                    Value="{StaticResource SEC_MidPurple}" />
         </Style>
 
         <Style x:Key="LabelTextBlockStyle"
@@ -38,27 +62,22 @@
             <Setter Property="FontWeight"
                     Value="Bold" />
             <Setter Property="FontSize"
-                    Value="13" />
+                    Value="11" />
+            <Setter Property="Margin"
+                    Value="0,0,10,5" />
+            <Setter Property="VerticalAlignment"
+                    Value="Top" />
         </Style>
 
         <Style x:Key="ValueTextBlockStyle"
                TargetType="TextBlock"
                BasedOn="{StaticResource ModernTextBlockStyle}">
             <Setter Property="FontSize"
-                    Value="13" />
-            <Setter Property="FontFamily"
-                    Value="Consolas" />
-        </Style>
-
-        <Style x:Key="StatusTextBlockStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource ModernTextBlockStyle}">
-            <Setter Property="FontSize"
                     Value="11" />
             <Setter Property="FontFamily"
                     Value="Consolas" />
-            <Setter Property="LineHeight"
-                    Value="16" />
+            <Setter Property="Margin"
+                    Value="0,0,0,5" />
             <Setter Property="TextWrapping"
                     Value="Wrap" />
         </Style>
@@ -66,9 +85,9 @@
         <Style x:Key="CloseButtonStyle"
                TargetType="Button">
             <Setter Property="Background"
-                    Value="#FF007ACC" />
+                    Value="{StaticResource SEC_MidBlue}" />
             <Setter Property="Foreground"
-                    Value="White" />
+                    Value="{StaticResource SEC_White}" />
             <Setter Property="BorderThickness"
                     Value="0" />
             <Setter Property="FontWeight"
@@ -92,12 +111,12 @@
                             <Trigger Property="IsMouseOver"
                                      Value="True">
                                 <Setter Property="Background"
-                                        Value="#FF1F8AD6" />
+                                        Value="{StaticResource SEC_LightBlue}" />
                             </Trigger>
                             <Trigger Property="IsPressed"
                                      Value="True">
                                 <Setter Property="Background"
-                                        Value="#FF005A9E" />
+                                        Value="{StaticResource SEC_NavyBlue}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -109,26 +128,137 @@
                TargetType="Button"
                BasedOn="{StaticResource CloseButtonStyle}">
             <Setter Property="Background"
-                    Value="#FF6C6C6C" />
+                    Value="#FF28A745" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver"
                          Value="True">
                     <Setter Property="Background"
-                            Value="#FF808080" />
+                            Value="#FF34CE57" />
                 </Trigger>
                 <Trigger Property="IsPressed"
                          Value="True">
                     <Setter Property="Background"
-                            Value="#FF4A4A4A" />
+                            Value="#FF1E7E34" />
                 </Trigger>
             </Style.Triggers>
         </Style>
 
-        <!-- Protocol Status Styles -->
-        <Style x:Key="ProtocolCardStyle"
+        <Style x:Key="SectionBorderStyle"
                TargetType="Border">
             <Setter Property="Background"
-                    Value="#FF383838" />
+                    Value="{StaticResource SEC_White}" />
+            <Setter Property="CornerRadius"
+                    Value="6" />
+            <Setter Property="Padding"
+                    Value="15" />
+            <Setter Property="Margin"
+                    Value="0,0,0,15" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="BorderBrush"
+                    Value="{StaticResource SEC_MidGrey}" />
+        </Style>
+
+        <!-- Log Level to Color and Icon Converter -->
+        <Style x:Key="LogIconStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource ModernTextBlockStyle}">
+            <Setter Property="FontFamily"
+                    Value="Segoe UI Symbol" />
+            <Setter Property="FontSize"
+                    Value="12" />
+            <Setter Property="Margin"
+                    Value="0,0,8,0" />
+            <Setter Property="VerticalAlignment"
+                    Value="Center" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Level}"
+                             Value="Success">
+                    <Setter Property="Foreground"
+                            Value="#FF28A745" />
+                    <Setter Property="Text"
+                            Value="✓" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Level}"
+                             Value="Warning">
+                    <Setter Property="Foreground"
+                            Value="#FFFFC107" />
+                    <Setter Property="Text"
+                            Value="⚠" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Level}"
+                             Value="Error">
+                    <Setter Property="Foreground"
+                            Value="#FFDC3545" />
+                    <Setter Property="Text"
+                            Value="✗" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Level}"
+                             Value="Info">
+                    <Setter Property="Foreground"
+                            Value="#FF17A2B8" />
+                    <Setter Property="Text"
+                            Value="→" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Protocol Group Header Style -->
+        <Style x:Key="ProtocolHeaderStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource ModernTextBlockStyle}">
+            <Setter Property="FontSize"
+                    Value="13" />
+            <Setter Property="FontWeight"
+                    Value="Bold" />
+            <Setter Property="Foreground"
+                    Value="{StaticResource SEC_MidPurple}" />
+            <Setter Property="Margin"
+                    Value="0,10,0,5" />
+        </Style>
+
+        <!-- Log Entry Style -->
+        <Style x:Key="LogEntryStyle"
+               TargetType="Border">
+            <Setter Property="Background"
+                    Value="{StaticResource SEC_LightGrey}" />
+            <Setter Property="CornerRadius"
+                    Value="3" />
+            <Setter Property="Padding"
+                    Value="8,4" />
+            <Setter Property="Margin"
+                    Value="0,1" />
+            <Setter Property="BorderThickness"
+                    Value="1,0,0,0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Level}"
+                             Value="Success">
+                    <Setter Property="BorderBrush"
+                            Value="#FF28A745" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Level}"
+                             Value="Warning">
+                    <Setter Property="BorderBrush"
+                            Value="#FFFFC107" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Level}"
+                             Value="Error">
+                    <Setter Property="BorderBrush"
+                            Value="#FFDC3545" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Level}"
+                             Value="Info">
+                    <Setter Property="BorderBrush"
+                            Value="#FF17A2B8" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Protocol Status Card Style -->
+        <Style x:Key="ProtocolStatusCardStyle"
+               TargetType="Border">
+            <Setter Property="Background"
+                    Value="{StaticResource SEC_LightPurple}" />
             <Setter Property="CornerRadius"
                     Value="6" />
             <Setter Property="Padding"
@@ -137,26 +267,23 @@
                     Value="5" />
             <Setter Property="BorderThickness"
                     Value="2" />
+        </Style>
+
+        <!-- Connection Info Style -->
+        <Style x:Key="ConnectionInfoStyle"
+               TargetType="Border">
+            <Setter Property="Background"
+                    Value="{StaticResource SEC_LightGrey}" />
+            <Setter Property="CornerRadius"
+                    Value="4" />
+            <Setter Property="Padding"
+                    Value="12,8" />
+            <Setter Property="Margin"
+                    Value="0,10,0,0" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
             <Setter Property="BorderBrush"
-                    Value="#FF505050" />
-        </Style>
-
-        <Style x:Key="ProtocolNameStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource ModernTextBlockStyle}">
-            <Setter Property="FontWeight"
-                    Value="Bold" />
-            <Setter Property="FontSize"
-                    Value="14" />
-        </Style>
-
-        <Style x:Key="ProtocolStatusStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource ModernTextBlockStyle}">
-            <Setter Property="FontSize"
-                    Value="10" />
-            <Setter Property="FontStyle"
-                    Value="Italic" />
+                    Value="{StaticResource SEC_MidGrey}" />
         </Style>
     </Window.Resources>
 
@@ -164,30 +291,26 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Header Section -->
+        <!-- Header -->
         <TextBlock Grid.Row="0"
-                   Text="Protocol compatibility test"
-                   Style="{StaticResource HeaderTextBlockStyle}"
-                   Margin="0,0,0,20" />
+                   Text="Protocol Status &amp; Activity Monitor"
+                   Style="{StaticResource HeaderTextBlockStyle}" />
 
-        <!-- Connection Information Section -->
+        <!-- Connection Information -->
         <Border Grid.Row="1"
-                Background="#FF383838"
-                CornerRadius="6"
-                Padding="15"
-                Margin="0,0,0,15">
+                Style="{StaticResource SectionBorderStyle}">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="120" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
@@ -195,146 +318,314 @@
                 <TextBlock Grid.Row="0"
                            Grid.Column="0"
                            Text="IP Address:"
-                           Style="{StaticResource LabelTextBlockStyle}"
-                           Margin="0,0,15,8" />
+                           Style="{StaticResource LabelTextBlockStyle}" />
                 <TextBlock Grid.Row="0"
                            Grid.Column="1"
-                           x:Name="IpAddressTextBlock"
-                           Style="{StaticResource ValueTextBlockStyle}"
-                           Margin="0,0,0,8" />
+                           Text="{Binding IpAddress}"
+                           Style="{StaticResource ValueTextBlockStyle}" />
 
-                <TextBlock Grid.Row="1"
-                           Grid.Column="0"
+                <TextBlock Grid.Row="0"
+                           Grid.Column="2"
                            Text="Port:"
-                           Style="{StaticResource LabelTextBlockStyle}"
-                           Margin="0,0,15,8" />
-                <TextBlock Grid.Row="1"
-                           Grid.Column="1"
-                           x:Name="PortTextBlock"
-                           Style="{StaticResource ValueTextBlockStyle}"
-                           Margin="0,0,0,8" />
+                           Style="{StaticResource LabelTextBlockStyle}" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="3"
+                           Text="{Binding Port}"
+                           Style="{StaticResource ValueTextBlockStyle}" />
 
-                <TextBlock Grid.Row="2"
+                <TextBlock Grid.Row="1"
                            Grid.Column="0"
                            Text="Live Status:"
-                           Style="{StaticResource LabelTextBlockStyle}"
-                           Margin="0,0,15,0"
-                           VerticalAlignment="Top" />
-                <TextBlock Grid.Row="2"
+                           Style="{StaticResource LabelTextBlockStyle}" />
+                <TextBlock Grid.Row="1"
                            Grid.Column="1"
-                           x:Name="LiveStatusTextBlock"
-                           Style="{StaticResource ValueTextBlockStyle}"
-                           TextWrapping="Wrap" />
+                           Grid.ColumnSpan="3"
+                           Text="{Binding LiveStatus}"
+                           Style="{StaticResource ValueTextBlockStyle}" />
             </Grid>
         </Border>
 
-        <!-- Dynamic Protocol Status Section -->
-        <Border Grid.Row="2"
-                Background="#FF1E1E1E"
-                BorderBrush="#FF404040"
-                BorderThickness="1"
-                CornerRadius="4"
-                Margin="0,0,0,15">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+        <!-- Main Content -->
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-                <Border Grid.Row="0"
-                        Background="#FF383838"
-                        CornerRadius="4,4,0,0"
-                        Padding="10,8">
-                    <TextBlock Text="Protocol Testing Status"
-                               Style="{StaticResource ModernTextBlockStyle}"
-                               FontWeight="Bold"
-                               FontSize="13" />
-                </Border>
+            <!-- Protocol Status Cards -->
+            <Border Grid.Row="0"
+                    Style="{StaticResource SectionBorderStyle}">
+                <StackPanel>
+                    <TextBlock Text="Protocol Status"
+                               Style="{StaticResource SectionHeaderStyle}" />
+                    <ItemsControl ItemsSource="{Binding ProtocolStatusCards}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource ProtocolStatusCardStyle}"
+                                        BorderBrush="{Binding BorderColor}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse Width="12"
+                                                     Height="12"
+                                                     Fill="{Binding StatusColor}"
+                                                     Margin="0,0,8,0"
+                                                     VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding ProtocolName}"
+                                                       Foreground="{StaticResource SEC_DarkGrey}"
+                                                       FontWeight="Bold"
+                                                       FontSize="14"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   Foreground="{StaticResource SEC_MidGrey}"
+                                                   FontSize="10"
+                                                   FontStyle="Italic"
+                                                   Margin="20,2,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
 
-                <UniformGrid Grid.Row="1"
-                             x:Name="ProtocolStatusGrid"
-                             Columns="2"
-                             Margin="10" />
-            </Grid>
-        </Border>
+            <!-- Activity Log -->
+            <Border Grid.Row="1"
+                    Style="{StaticResource SectionBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-        <!-- Live Status Activity Section -->
-        <Border Grid.Row="3"
-                Background="#FF1E1E1E"
-                BorderBrush="#FF404040"
-                BorderThickness="1"
-                CornerRadius="4"
-                Margin="0,0,0,15">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <Border Grid.Row="0"
-                        Background="#FF383838"
-                        CornerRadius="4,4,0,0"
-                        Padding="10,8">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Grid.Column="0"
-                                   Text="Live Protocol Activity"
-                                   Style="{StaticResource ModernTextBlockStyle}"
-                                   FontWeight="Bold"
-                                   FontSize="13" />
-
-                        <Button Grid.Column="1"
-                                Content="Copy Logs"
+                    <DockPanel Grid.Row="0"
+                               Margin="0,0,0,10">
+                        <TextBlock Text="Live Activity Monitor"
+                                   Style="{StaticResource SectionHeaderStyle}"
+                                   DockPanel.Dock="Left" />
+                        <Button Content="{Binding CopyButtonText}"
                                 Width="80"
-                                Height="26"
+                                Height="24"
+                                HorizontalAlignment="Right"
                                 Style="{StaticResource CopyButtonStyle}"
-                                Click="CopyLogsButton_Click"
-                                ToolTip="Copy all logs to clipboard" />
-                    </Grid>
-                </Border>
+                                Command="{Binding CopyLogsCommand}"
+                                IsEnabled="{Binding CopyButtonEnabled}"
+                                DockPanel.Dock="Right" />
+                    </DockPanel>
 
-                <ScrollViewer Grid.Row="1"
-                              x:Name="StatusScrollViewer"
-                              VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Auto"
-                              Padding="10">
-                    <TextBox x:Name="StatusActivityTextBox"
-                             Style="{x:Null}"
-                             Background="Transparent"
-                             Foreground="White"
-                             FontFamily="Consolas"
-                             FontSize="11"
-                             TextWrapping="Wrap"
-                             BorderThickness="0"
-                             IsReadOnly="True"
-                             VerticalScrollBarVisibility="Disabled"
-                             HorizontalScrollBarVisibility="Disabled"
-                             Text="Monitoring protocol activity..." />
-                </ScrollViewer>
-            </Grid>
-        </Border>
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!-- Protocol Groups -->
+                            <ItemsControl ItemsSource="{Binding ProtocolGroups}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="0,0,0,15">
+                                            <!-- Protocol Header with custom formatting -->
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0"
+                                                            Orientation="Horizontal">
+                                                    <TextBlock Text="┌─ "
+                                                               Style="{StaticResource ProtocolHeaderStyle}"
+                                                               FontFamily="Consolas" />
+                                                    <TextBlock Text="{Binding ProtocolName}"
+                                                               Style="{StaticResource ProtocolHeaderStyle}"
+                                                               FontFamily="Consolas" />
+                                                    <TextBlock Text=" PROTOCOL "
+                                                               Style="{StaticResource ProtocolHeaderStyle}"
+                                                               FontFamily="Consolas" />
+                                                </StackPanel>
+
+                                                <Border Grid.Column="1"
+                                                        Height="1"
+                                                        Background="{StaticResource SEC_MidPurple}"
+                                                        VerticalAlignment="Center"
+                                                        Margin="5,0,0,0" />
+                                            </Grid>
+
+                                            <!-- Log Entries -->
+                                            <ItemsControl ItemsSource="{Binding LogEntries}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Style="{StaticResource LogEntryStyle}">
+                                                            <StackPanel>
+                                                                <!-- Main log line -->
+                                                                <DockPanel>
+                                                                    <TextBlock Text="{Binding FormattedTimestamp, StringFormat='[{0}]'}"
+                                                                               Style="{StaticResource ModernTextBlockStyle}"
+                                                                               FontFamily="Consolas"
+                                                                               FontSize="10"
+                                                                               Foreground="{StaticResource SEC_MidGrey}"
+                                                                               Margin="0,0,8,0"
+                                                                               DockPanel.Dock="Left" />
+
+                                                                    <TextBlock Style="{StaticResource LogIconStyle}"
+                                                                               DockPanel.Dock="Left" />
+
+                                                                    <TextBlock Text="{Binding Step}"
+                                                                               Style="{StaticResource ModernTextBlockStyle}"
+                                                                               FontFamily="Consolas"
+                                                                               FontSize="11"
+                                                                               TextWrapping="Wrap" />
+                                                                </DockPanel>
+
+                                                                <!-- Details (if present) -->
+                                                                <TextBlock Text="{Binding Details, StringFormat='    └─ {0}'}"
+                                                                           Style="{StaticResource ModernTextBlockStyle}"
+                                                                           FontFamily="Consolas"
+                                                                           FontSize="10"
+                                                                           Foreground="{StaticResource SEC_MidGrey}"
+                                                                           Margin="20,2,0,0"
+                                                                           TextWrapping="Wrap"
+                                                                           Visibility="{Binding Details, Converter={StaticResource StringToVisibilityConverter}}" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <!-- Protocol Footer -->
+                                            <TextBlock Text="└─────────────────────────────────────────────────────────────────"
+                                                       Style="{StaticResource ModernTextBlockStyle}"
+                                                       FontFamily="Consolas"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource SEC_MidPurple}"
+                                                       Margin="0,5,0,0" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Connection Summary -->
+                            <Border Style="{StaticResource ConnectionInfoStyle}">
+                                <StackPanel>
+                                    <!-- Summary Content (removed text-based header) -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0"
+                                                   Grid.Column="0"
+                                                   Text="  IP Address ........:"
+                                                   Style="{StaticResource ModernTextBlockStyle}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11" />
+                                        <TextBlock Grid.Row="0"
+                                                   Grid.Column="1"
+                                                   Text="{Binding SummaryIpAddress}"
+                                                   Style="{StaticResource ModernTextBlockStyle}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11"
+                                                   Margin="5,0,0,0" />
+
+                                        <TextBlock Grid.Row="1"
+                                                   Grid.Column="0"
+                                                   Text="  Port ..............:"
+                                                   Style="{StaticResource ModernTextBlockStyle}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11" />
+                                        <TextBlock Grid.Row="1"
+                                                   Grid.Column="1"
+                                                   Text="{Binding SummaryPort}"
+                                                   Style="{StaticResource ModernTextBlockStyle}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11"
+                                                   Margin="5,0,0,0" />
+
+                                        <TextBlock Grid.Row="2"
+                                                   Grid.Column="0"
+                                                   Text="  Selected Protocol .:"
+                                                   Style="{StaticResource ModernTextBlockStyle}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11" />
+                                        <TextBlock Grid.Row="2"
+                                                   Grid.Column="1"
+                                                   Text="{Binding SummaryProtocol}"
+                                                   Style="{StaticResource ModernTextBlockStyle}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11"
+                                                   Margin="5,0,0,0" />
+
+                                        <TextBlock Grid.Row="3"
+                                                   Grid.Column="0"
+                                                   Text="  Username ...........:"
+                                                   Style="{StaticResource ModernTextBlockStyle}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11" />
+                                        <TextBlock Grid.Row="3"
+                                                   Grid.Column="1"
+                                                   Text="{Binding SummaryUsername}"
+                                                   Style="{StaticResource ModernTextBlockStyle}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11"
+                                                   Margin="5,0,0,0" />
+
+                                        <TextBlock Grid.Row="4"
+                                                   Grid.Column="0"
+                                                   Text="  Total Log Entries .:"
+                                                   Style="{StaticResource ModernTextBlockStyle}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11" />
+                                        <TextBlock Grid.Row="4"
+                                                   Grid.Column="1"
+                                                   Text="{Binding SummaryLogCount}"
+                                                   Style="{StaticResource ModernTextBlockStyle}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11"
+                                                   Margin="5,0,0,0" />
+
+                                        <TextBlock Grid.Row="5"
+                                                   Grid.Column="0"
+                                                   Text="  Last Updated ......:"
+                                                   Style="{StaticResource ModernTextBlockStyle}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11" />
+                                        <TextBlock Grid.Row="5"
+                                                   Grid.Column="1"
+                                                   Text="{Binding SummaryLastUpdated}"
+                                                   Style="{StaticResource ModernTextBlockStyle}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11"
+                                                   Margin="5,0,0,0" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
 
         <!-- Button Section -->
-        <StackPanel Grid.Row="4"
+        <StackPanel Grid.Row="3"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
-            <Button Content="Copy All Logs"
-                    Width="100"
-                    Height="32"
-                    Margin="0,0,10,0"
-                    Style="{StaticResource CopyButtonStyle}"
-                    Click="CopyAllLogsButton_Click"
-                    ToolTip="Copy all logs to clipboard" />
-
             <Button Content="Close"
                     Width="80"
                     Height="32"
                     Style="{StaticResource CloseButtonStyle}"
-                    Click="CloseButton_Click" />
+                    Command="{Binding CloseCommand}" />
         </StackPanel>
     </Grid>
 </Window>

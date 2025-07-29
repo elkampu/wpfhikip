@@ -26,7 +26,7 @@
         SSH = 32,           // SSH banner grabbing
         Telnet = 33,        // Telnet probing
 
-        // Platform-Specific Discovery
+        // Platform-Specific Discovery  
         NetBIOS = 40,       // NetBIOS name resolution
         SMB = 41,           // SMB/CIFS shares discovery
         WMI = 42,           // Windows Management Instrumentation
@@ -50,36 +50,78 @@
     /// </summary>
     public static class DiscoveryMethodExtensions
     {
+        // Pre-computed descriptions to avoid repeated string concatenation
+        private static readonly IReadOnlyDictionary<DiscoveryMethod, string> s_descriptions = 
+            new Dictionary<DiscoveryMethod, string>
+            {
+                [DiscoveryMethod.SSDP] = "SSDP/UPnP Discovery",
+                [DiscoveryMethod.WSDiscovery] = "WS-Discovery",
+                [DiscoveryMethod.mDNS] = "mDNS/Bonjour",
+                [DiscoveryMethod.DHCP] = "DHCP Analysis",
+                [DiscoveryMethod.ARP] = "ARP Table Scan",
+                [DiscoveryMethod.ICMP] = "ICMP Ping Sweep",
+                [DiscoveryMethod.PortScan] = "Port Scanning",
+                [DiscoveryMethod.SNMP] = "SNMP Discovery",
+                [DiscoveryMethod.HTTP] = "HTTP Probing",
+                [DiscoveryMethod.SSH] = "SSH Banner Grab",
+                [DiscoveryMethod.Telnet] = "Telnet Probing",
+                [DiscoveryMethod.NetBIOS] = "NetBIOS Discovery",
+                [DiscoveryMethod.SMB] = "SMB/CIFS Discovery",
+                [DiscoveryMethod.WMI] = "WMI Query",
+                [DiscoveryMethod.ONVIFProbe] = "ONVIF Probe",
+                [DiscoveryMethod.RTSPProbe] = "RTSP Discovery",
+                [DiscoveryMethod.ActiveScan] = "Active Network Scan",
+                [DiscoveryMethod.PassiveMonitor] = "Passive Monitoring",
+                [DiscoveryMethod.Manual] = "Manual Entry",
+                [DiscoveryMethod.Import] = "External Import",
+                [DiscoveryMethod.Database] = "Database Query"
+            };
+
+        private static readonly IReadOnlyDictionary<DiscoveryMethod, string> s_categories = 
+            new Dictionary<DiscoveryMethod, string>
+            {
+                [DiscoveryMethod.SSDP] = "Multicast/Broadcast",
+                [DiscoveryMethod.WSDiscovery] = "Multicast/Broadcast",
+                [DiscoveryMethod.mDNS] = "Multicast/Broadcast",
+                [DiscoveryMethod.DHCP] = "Multicast/Broadcast",
+                [DiscoveryMethod.ARP] = "Network Layer",
+                [DiscoveryMethod.ICMP] = "Network Layer",
+                [DiscoveryMethod.PortScan] = "Transport Layer",
+                [DiscoveryMethod.SNMP] = "Application Layer",
+                [DiscoveryMethod.HTTP] = "Application Layer",
+                [DiscoveryMethod.SSH] = "Application Layer",
+                [DiscoveryMethod.Telnet] = "Application Layer",
+                [DiscoveryMethod.NetBIOS] = "Platform-Specific",
+                [DiscoveryMethod.SMB] = "Platform-Specific",
+                [DiscoveryMethod.WMI] = "Platform-Specific",
+                [DiscoveryMethod.ONVIFProbe] = "Security-Specific",
+                [DiscoveryMethod.RTSPProbe] = "Security-Specific",
+                [DiscoveryMethod.ActiveScan] = "Hybrid",
+                [DiscoveryMethod.PassiveMonitor] = "Hybrid",
+                [DiscoveryMethod.Manual] = "Manual/External",
+                [DiscoveryMethod.Import] = "Manual/External",
+                [DiscoveryMethod.Database] = "Manual/External"
+            };
+
+        private static readonly IReadOnlyDictionary<DiscoveryMethod, TimeSpan> s_defaultTimeouts = 
+            new Dictionary<DiscoveryMethod, TimeSpan>
+            {
+                [DiscoveryMethod.SSDP] = TimeSpan.FromSeconds(30),
+                [DiscoveryMethod.WSDiscovery] = TimeSpan.FromSeconds(15),
+                [DiscoveryMethod.mDNS] = TimeSpan.FromSeconds(10),
+                [DiscoveryMethod.ICMP] = TimeSpan.FromSeconds(5),
+                [DiscoveryMethod.PortScan] = TimeSpan.FromMinutes(2),
+                [DiscoveryMethod.SNMP] = TimeSpan.FromSeconds(10),
+                [DiscoveryMethod.ARP] = TimeSpan.FromSeconds(5),
+                [DiscoveryMethod.ActiveScan] = TimeSpan.FromMinutes(5)
+            };
+
         /// <summary>
         /// Gets a human-readable description of the discovery method
         /// </summary>
         public static string GetDescription(this DiscoveryMethod method)
         {
-            return method switch
-            {
-                DiscoveryMethod.SSDP => "SSDP/UPnP Discovery",
-                DiscoveryMethod.WSDiscovery => "WS-Discovery",
-                DiscoveryMethod.mDNS => "mDNS/Bonjour",
-                DiscoveryMethod.DHCP => "DHCP Analysis",
-                DiscoveryMethod.ARP => "ARP Table Scan",
-                DiscoveryMethod.ICMP => "ICMP Ping Sweep",
-                DiscoveryMethod.PortScan => "Port Scanning",
-                DiscoveryMethod.SNMP => "SNMP Discovery",
-                DiscoveryMethod.HTTP => "HTTP Probing",
-                DiscoveryMethod.SSH => "SSH Banner Grab",
-                DiscoveryMethod.Telnet => "Telnet Probing",
-                DiscoveryMethod.NetBIOS => "NetBIOS Discovery",
-                DiscoveryMethod.SMB => "SMB/CIFS Discovery",
-                DiscoveryMethod.WMI => "WMI Query",
-                DiscoveryMethod.ONVIFProbe => "ONVIF Probe",
-                DiscoveryMethod.RTSPProbe => "RTSP Discovery",
-                DiscoveryMethod.ActiveScan => "Active Network Scan",
-                DiscoveryMethod.PassiveMonitor => "Passive Monitoring",
-                DiscoveryMethod.Manual => "Manual Entry",
-                DiscoveryMethod.Import => "External Import",
-                DiscoveryMethod.Database => "Database Query",
-                _ => "Unknown Method"
-            };
+            return s_descriptions.TryGetValue(method, out var description) ? description : "Unknown Method";
         }
 
         /// <summary>
@@ -87,18 +129,7 @@
         /// </summary>
         public static string GetCategory(this DiscoveryMethod method)
         {
-            return method switch
-            {
-                >= DiscoveryMethod.SSDP and <= DiscoveryMethod.DHCP => "Multicast/Broadcast",
-                >= DiscoveryMethod.ARP and <= DiscoveryMethod.ICMP => "Network Layer",
-                DiscoveryMethod.PortScan => "Transport Layer",
-                >= DiscoveryMethod.SNMP and <= DiscoveryMethod.Telnet => "Application Layer",
-                >= DiscoveryMethod.NetBIOS and <= DiscoveryMethod.WMI => "Platform-Specific",
-                >= DiscoveryMethod.ONVIFProbe and <= DiscoveryMethod.RTSPProbe => "Security-Specific",
-                >= DiscoveryMethod.ActiveScan and <= DiscoveryMethod.PassiveMonitor => "Hybrid",
-                >= DiscoveryMethod.Manual and <= DiscoveryMethod.Database => "Manual/External",
-                _ => "Unknown"
-            };
+            return s_categories.TryGetValue(method, out var category) ? category : "Unknown";
         }
 
         /// <summary>
@@ -108,9 +139,7 @@
         {
             return method switch
             {
-                DiscoveryMethod.Manual => false,
-                DiscoveryMethod.Import => false,
-                DiscoveryMethod.Database => false,
+                DiscoveryMethod.Manual or DiscoveryMethod.Import or DiscoveryMethod.Database => false,
                 _ => true
             };
         }
@@ -122,11 +151,11 @@
         {
             return method switch
             {
-                DiscoveryMethod.PassiveMonitor => false,
-                DiscoveryMethod.ARP => false, // Reading ARP table is passive
-                DiscoveryMethod.DHCP => false, // Reading DHCP leases is passive
-                DiscoveryMethod.Manual => false,
-                DiscoveryMethod.Import => false,
+                DiscoveryMethod.PassiveMonitor or
+                DiscoveryMethod.ARP or      // Reading ARP table is passive
+                DiscoveryMethod.DHCP or     // Reading DHCP leases is passive
+                DiscoveryMethod.Manual or
+                DiscoveryMethod.Import or
                 DiscoveryMethod.Database => false,
                 _ => true
             };
@@ -137,18 +166,7 @@
         /// </summary>
         public static TimeSpan GetDefaultTimeout(this DiscoveryMethod method)
         {
-            return method switch
-            {
-                DiscoveryMethod.SSDP => TimeSpan.FromSeconds(30),
-                DiscoveryMethod.WSDiscovery => TimeSpan.FromSeconds(15),
-                DiscoveryMethod.mDNS => TimeSpan.FromSeconds(10),
-                DiscoveryMethod.ICMP => TimeSpan.FromSeconds(5),
-                DiscoveryMethod.PortScan => TimeSpan.FromMinutes(2),
-                DiscoveryMethod.SNMP => TimeSpan.FromSeconds(10),
-                DiscoveryMethod.ARP => TimeSpan.FromSeconds(5),
-                DiscoveryMethod.ActiveScan => TimeSpan.FromMinutes(5),
-                _ => TimeSpan.FromSeconds(30)
-            };
+            return s_defaultTimeouts.TryGetValue(method, out var timeout) ? timeout : TimeSpan.FromSeconds(30);
         }
     }
 }

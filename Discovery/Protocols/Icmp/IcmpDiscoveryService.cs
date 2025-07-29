@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
+﻿using System.Net;
 using System.Net.NetworkInformation;
-using System.Threading;
-using System.Threading.Tasks;
 
 using wpfhikip.Discovery.Core;
 using wpfhikip.Discovery.Models;
@@ -34,12 +29,22 @@ namespace wpfhikip.Discovery.Protocols.Icmp
                 // Get all local network segments
                 var networkSegments = NetworkUtils.GetLocalNetworkSegments();
 
+                if (!networkSegments.Any())
+                {
+                    ReportProgress(0, 0, "", "No local network segments found");
+                    return devices;
+                }
+
                 ReportProgress(0, networkSegments.Count, "", "Starting ICMP discovery on local segments");
 
+                var segmentIndex = 0;
                 foreach (var segment in networkSegments)
                 {
                     if (cancellationToken.IsCancellationRequested)
                         break;
+
+                    segmentIndex++;
+                    ReportProgress(segmentIndex, networkSegments.Count, segment, $"Scanning segment {segment}");
 
                     var segmentDevices = await DiscoverDevicesAsync(segment, cancellationToken);
                     devices.AddRange(segmentDevices);
@@ -63,7 +68,10 @@ namespace wpfhikip.Discovery.Protocols.Icmp
             var devices = new List<DiscoveredDevice>();
 
             if (string.IsNullOrEmpty(networkSegment))
+            {
+                ReportProgress(0, 0, "", "Network segment is null or empty");
                 return devices;
+            }
 
             try
             {
@@ -75,10 +83,20 @@ namespace wpfhikip.Discovery.Protocols.Icmp
                     return devices;
                 }
 
+                // Limit the number of addresses to scan for performance
+                var maxAddresses = 254; // Reasonable limit for /24 networks
+                if (ipAddresses.Count > maxAddresses)
+                {
+                    ReportProgress(0, 0, networkSegment, $"Limiting scan to first {maxAddresses} addresses (of {ipAddresses.Count} total)");
+                    ipAddresses = ipAddresses.Take(maxAddresses).ToList();
+                }
+
                 ReportProgress(0, ipAddresses.Count, networkSegment, $"Pinging {ipAddresses.Count} addresses in {networkSegment}");
 
-                // Use semaphore to limit concurrent pings
-                using var semaphore = new SemaphoreSlim(50); // Limit to 50 concurrent pings
+                // Use semaphore to limit concurrent pings to avoid overwhelming the network
+                using var semaphore = new SemaphoreSlim(25); // Reduced from 50 for better stability
+                var completedCount = 0;
+
                 var pingTasks = ipAddresses.Select(async (ip, index) =>
                 {
                     await semaphore.WaitAsync(cancellationToken);
@@ -86,8 +104,6 @@ namespace wpfhikip.Discovery.Protocols.Icmp
                     {
                         if (cancellationToken.IsCancellationRequested)
                             return;
-
-                        ReportProgress(index + 1, ipAddresses.Count, ip.ToString(), "Pinging...");
 
                         var device = await PingAddressAsync(ip, cancellationToken);
                         if (device != null)
@@ -98,6 +114,19 @@ namespace wpfhikip.Discovery.Protocols.Icmp
                             }
                             DeviceDiscovered?.Invoke(this, new DeviceDiscoveredEventArgs(device, ServiceName));
                         }
+
+                        // Update progress
+                        var completed = Interlocked.Increment(ref completedCount);
+                        if (completed % 10 == 0 || completed == ipAddresses.Count) // Report every 10 addresses or at the end
+                        {
+                            ReportProgress(completed, ipAddresses.Count, ip.ToString(), $"Completed {completed}/{ipAddresses.Count}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log individual ping errors but don't stop the scan
+                        var completed = Interlocked.Increment(ref completedCount);
+                        ReportProgress(completed, ipAddresses.Count, ip.ToString(), $"Error pinging {ip}: {ex.Message}");
                     }
                     finally
                     {
@@ -126,7 +155,11 @@ namespace wpfhikip.Discovery.Protocols.Icmp
             try
             {
                 using var ping = new Ping();
-                var timeout = (int)TimeSpan.FromSeconds(2).TotalMilliseconds;
+                var timeout = 3000; // 3 second timeout - reasonable for local networks
+
+                // Use the async version with proper cancellation handling
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeout));
+                using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
                 var reply = await ping.SendPingAsync(ipAddress, timeout);
 
@@ -146,15 +179,22 @@ namespace wpfhikip.Discovery.Protocols.Icmp
                     device.DiscoveryData["ICMP_RoundtripTime"] = reply.RoundtripTime;
                     device.DiscoveryData["ICMP_Status"] = reply.Status.ToString();
 
-                    // Try to resolve hostname
+                    // Try to resolve hostname (but don't wait too long)
                     try
                     {
+                        using var hostnameCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                        using var hostnameTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, hostnameCts.Token);
+
                         var hostname = await NetworkUtils.GetHostnameAsync(ipAddress);
                         if (!string.IsNullOrEmpty(hostname) && hostname != ipAddress.ToString())
                         {
                             device.Name = hostname;
                             device.DiscoveryData["ICMP_Hostname"] = hostname;
                         }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Hostname resolution timed out or was cancelled - not critical
                     }
                     catch
                     {
@@ -166,11 +206,15 @@ namespace wpfhikip.Discovery.Protocols.Icmp
             }
             catch (PingException)
             {
-                // Ping failed - device not responsive or blocked
+                // Ping failed - device not responsive or ICMP blocked
+            }
+            catch (OperationCanceledException)
+            {
+                // Operation was cancelled - normal during shutdown
             }
             catch (Exception)
             {
-                // Other error - ignore
+                // Other error - ignore individual ping failures
             }
 
             return null;

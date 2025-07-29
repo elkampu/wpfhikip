@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text;
 
 namespace wpfhikip.Protocols.Onvif
 {
@@ -33,11 +29,36 @@ namespace wpfhikip.Protocols.Onvif
         // URL Builders
         public static class UrlBuilders
         {
+            private static readonly StringBuilder s_stringBuilder = new(256);
+            private static readonly object s_lock = new();
+            
+            // Cache common ports array to avoid allocation
+            private static readonly int[] s_commonPorts = { 80, 8080, 8000, 554, 8554, 443, 8443 };
+
             public static string BuildServiceUrl(string ipAddress, string service, int port = 80, bool useHttps = false)
             {
-                var protocol = useHttps ? "https" : "http";
-                var portSuffix = (port != 80 && port != 443) ? $":{port}" : "";
-                return $"{protocol}://{ipAddress}{portSuffix}{service}";
+                ArgumentException.ThrowIfNullOrWhiteSpace(ipAddress);
+                ArgumentException.ThrowIfNullOrWhiteSpace(service);
+
+                if (port is <= 0 or > 65535)
+                    throw new ArgumentOutOfRangeException(nameof(port), "Port must be between 1 and 65535");
+
+                lock (s_lock)
+                {
+                    s_stringBuilder.Clear();
+                    s_stringBuilder.Append(useHttps ? "https://" : "http://");
+                    s_stringBuilder.Append(ipAddress);
+                    
+                    // Only add port if it's not the default for the protocol
+                    if (port != (useHttps ? 443 : 80))
+                    {
+                        s_stringBuilder.Append(':');
+                        s_stringBuilder.Append(port);
+                    }
+                    
+                    s_stringBuilder.Append(service);
+                    return s_stringBuilder.ToString();
+                }
             }
 
             public static string BuildDeviceServiceUrl(string ipAddress, int port = 80, bool useHttps = false)
@@ -60,10 +81,7 @@ namespace wpfhikip.Protocols.Onvif
                 };
             }
 
-            public static int[] GetCommonOnvifPorts()
-            {
-                return new[] { 80, 8080, 8000, 554, 8554, 443, 8443 };
-            }
+            public static int[] GetCommonOnvifPorts() => s_commonPorts;
         }
 
         // ONVIF SOAP Actions

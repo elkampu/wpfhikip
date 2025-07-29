@@ -61,9 +61,11 @@
             <Button Content="Sites Management"
                     Style="{StaticResource ModernMenuButtonStyle}" />
             <Button Content="Network Scanner"
-                    Style="{StaticResource ModernMenuButtonStyle}" />
+                    Style="{StaticResource ModernMenuButtonStyle}"
+                    Click="NetworkScannerButton_Click" />
             <Button Content="Batch Configuration"
-                    Style="{StaticResource ModernMenuButtonStyle}" />
+                    Style="{StaticResource ModernMenuButtonStyle}"
+                    Click="BatchConfigurationButton_Click" />
             <Button Content="Backup Assistant"
                     Style="{StaticResource ModernMenuButtonStyle}" />
             <Button Content="Maintenance Tools"

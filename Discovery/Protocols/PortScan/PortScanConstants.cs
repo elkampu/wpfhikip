@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-
-namespace wpfhikip.Discovery.Protocols.PortScan
+﻿namespace wpfhikip.Discovery.Protocols.PortScan
 {
     /// <summary>
     /// Constants for port scanning

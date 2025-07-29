@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
+﻿using System.Text.Json;
 
 using wpfhikip.Models;
 
@@ -69,6 +64,19 @@ namespace wpfhikip.Protocols.Axis
                         ParseJsonElement(item, result, key);
                         index++;
                     }
+                    break;
+                case JsonValueKind.String:
+                    result[prefix] = element.GetString() ?? "";
+                    break;
+                case JsonValueKind.Number:
+                    result[prefix] = element.GetDouble();
+                    break;
+                case JsonValueKind.True:
+                case JsonValueKind.False:
+                    result[prefix] = element.GetBoolean();
+                    break;
+                case JsonValueKind.Null:
+                    result[prefix] = null!;
                     break;
                 default:
                     result[prefix] = element.ToString();
@@ -169,14 +177,31 @@ namespace wpfhikip.Protocols.Axis
         /// </summary>
         public static bool HasConfigurationChanged(Dictionary<string, object> currentConfig, Camera camera)
         {
-            return HasNetworkConfigChanged(currentConfig, camera);
-        }
+            if (currentConfig == null || camera == null)
+                return true;
 
-        private static bool HasNetworkConfigChanged(Dictionary<string, object> currentConfig, Camera camera)
-        {
-            // This would need to be implemented based on the actual response structure from Axis
-            // For now, we'll return true to always attempt the update
-            return true;
+            // Check if IP address has changed
+            if (currentConfig.TryGetValue("data.staticAddressConfigurations[0].address", out var currentIp) &&
+                currentIp?.ToString() != camera.NewIP)
+                return true;
+
+            // Check if subnet mask has changed (convert prefix length to subnet mask)
+            if (currentConfig.TryGetValue("data.staticAddressConfigurations[0].prefixLength", out var prefixLengthObj))
+            {
+                if (int.TryParse(prefixLengthObj.ToString(), out var prefixLength))
+                {
+                    var currentMask = ConvertPrefixLengthToSubnetMask(prefixLength);
+                    if (currentMask != camera.NewMask)
+                        return true;
+                }
+            }
+
+            // Check if gateway has changed
+            if (currentConfig.TryGetValue("data.staticDefaultRouter", out var currentGateway) &&
+                currentGateway?.ToString() != camera.NewGateway)
+                return true;
+
+            return false;
         }
 
         /// <summary>
@@ -197,14 +222,22 @@ namespace wpfhikip.Protocols.Axis
         }
 
         /// <summary>
+        /// Converts CIDR prefix length to subnet mask
+        /// </summary>
+        public static string ConvertPrefixLengthToSubnetMask(int prefixLength)
+        {
+            var mask = ~(0xffffffff >> prefixLength);
+            return $"{(mask >> 24) & 0xff}.{(mask >> 16) & 0xff}.{(mask >> 8) & 0xff}.{mask & 0xff}";
+        }
+
+        /// <summary>
         /// Extracts specific configuration values for easier access
         /// </summary>
         public static class ConfigExtractor
         {
             public static string GetCurrentIP(Dictionary<string, object> config)
             {
-                // This would need to be implemented based on actual Axis response structure
-                return config.GetValueOrDefault("data.staticAddressConfigurations[0].address", "").ToString();
+                return config.GetValueOrDefault("data.staticAddressConfigurations[0].address", "").ToString() ?? "";
             }
 
             public static string GetCurrentSubnetMask(Dictionary<string, object> config)
@@ -220,18 +253,12 @@ namespace wpfhikip.Protocols.Axis
 
             public static string GetCurrentGateway(Dictionary<string, object> config)
             {
-                return config.GetValueOrDefault("data.staticDefaultRouter", "").ToString();
+                return config.GetValueOrDefault("data.staticDefaultRouter", "").ToString() ?? "";
             }
 
             public static string GetDeviceModel(Dictionary<string, object> config)
             {
-                return config.GetValueOrDefault("Properties.System.ProductName", "Unknown Axis Device").ToString();
-            }
-
-            private static string ConvertPrefixLengthToSubnetMask(int prefixLength)
-            {
-                var mask = ~(0xffffffff >> prefixLength);
-                return $"{(mask >> 24) & 0xff}.{(mask >> 16) & 0xff}.{(mask >> 8) & 0xff}.{mask & 0xff}";
+                return config.GetValueOrDefault("Properties.System.ProductName", "Unknown Axis Device").ToString() ?? "";
             }
         }
     }

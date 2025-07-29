@@ -17,15 +17,17 @@
     <Window.Resources>
         <!-- Add the converters -->
         <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
         <converters:EnumToStringConverter x:Key="EnumToStringConverter" />
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 
         <!-- Modern Button Style with bigger size -->
         <Style x:Key="ModernButtonStyle"
                TargetType="Button">
             <Setter Property="Background"
-                    Value="#FF007ACC" />
+                    Value="{StaticResource SEC_MidBlue}" />
             <Setter Property="Foreground"
-                    Value="White" />
+                    Value="{StaticResource SEC_White}" />
             <Setter Property="BorderThickness"
                     Value="0" />
             <Setter Property="FontWeight"
@@ -53,24 +55,44 @@
                             <Trigger Property="IsMouseOver"
                                      Value="True">
                                 <Setter Property="Background"
-                                        Value="#FF1F8AD6" />
+                                        Value="{StaticResource SEC_LightBlue}" />
                             </Trigger>
                             <Trigger Property="IsPressed"
                                      Value="True">
                                 <Setter Property="Background"
-                                        Value="#FF005A9E" />
+                                        Value="{StaticResource SEC_NavyBlue}" />
                             </Trigger>
                             <Trigger Property="IsEnabled"
                                      Value="False">
                                 <Setter Property="Background"
-                                        Value="#FFB0B0B0" />
+                                        Value="{StaticResource SEC_LightGrey}" />
                                 <Setter Property="Foreground"
-                                        Value="#FF808080" />
+                                        Value="{StaticResource SEC_MidGrey}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <!-- Cancel Button Style (red theme) -->
+        <Style x:Key="CancelButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ModernButtonStyle}">
+            <Setter Property="Background"
+                    Value="{StaticResource SEC_InfoRed}" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver"
+                         Value="True">
+                    <Setter Property="Background"
+                            Value="{StaticResource SEC_MidRed}" />
+                </Trigger>
+                <Trigger Property="IsPressed"
+                         Value="True">
+                    <Setter Property="Background"
+                            Value="{StaticResource SEC_DarkRed}" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <!-- Status Button Style for DataGrid cells -->
@@ -83,7 +105,7 @@
             <Setter Property="BorderThickness"
                     Value="1" />
             <Setter Property="BorderBrush"
-                    Value="#FF808080" />
+                    Value="{StaticResource SEC_MidGrey}" />
             <Setter Property="FontWeight"
                     Value="Medium" />
             <Setter Property="FontSize"
@@ -143,14 +165,14 @@
                             <Trigger Property="IsMouseOver"
                                      Value="True">
                                 <Setter Property="BorderBrush"
-                                        Value="#FF000000" />
+                                        Value="{StaticResource SEC_DarkGrey}" />
                                 <Setter Property="BorderThickness"
                                         Value="2" />
                             </Trigger>
                             <Trigger Property="IsPressed"
                                      Value="True">
                                 <Setter Property="BorderBrush"
-                                        Value="#FF000000" />
+                                        Value="{StaticResource SEC_DarkGrey}" />
                                 <Setter Property="BorderThickness"
                                         Value="2" />
                             </Trigger>
@@ -203,7 +225,7 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <!-- Protocol Column - Updated to properly handle enum binding with converter -->
+                        <!-- Protocol Column - Fixed to properly handle enum binding -->
                         <DataGridTemplateColumn Header="Protocol"
                                                 Width="80"
                                                 MinWidth="80"
@@ -218,10 +240,16 @@
                             </DataGridTemplateColumn.CellTemplate>
                             <DataGridTemplateColumn.CellEditingTemplate>
                                 <DataTemplate>
-                                    <ComboBox SelectedValue="{Binding Protocol, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource EnumToStringConverter}}"
+                                    <ComboBox SelectedValue="{Binding Protocol, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                               ItemsSource="{Binding Path=DataContext.ProtocolOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
                                               FontSize="12"
-                                              HorizontalContentAlignment="Center" />
+                                              HorizontalContentAlignment="Center">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Converter={StaticResource EnumToStringConverter}}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
@@ -391,25 +419,51 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
 
-                        <DataGridTextColumn Header="Net"
-                                            Width="70"
-                                            MinWidth="70"
-                                            MaxWidth="70"
-                                            Binding="{Binding OnlineStatus}"
-                                            IsReadOnly="True">
-                            <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="HorizontalAlignment"
-                                            Value="Center" />
-                                    <Setter Property="VerticalAlignment"
-                                            Value="Center" />
-                                    <Setter Property="FontSize"
-                                            Value="11" />
-                                    <Setter Property="FontWeight"
-                                            Value="Medium" />
-                                </Style>
-                            </DataGridTextColumn.ElementStyle>
-                        </DataGridTextColumn>
+                        <DataGridTemplateColumn Header="Net"
+                                                Width="70"
+                                                MinWidth="70"
+                                                MaxWidth="70"
+                                                IsReadOnly="True">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="Info"
+                                            Click="CameraInfoButton_Click"
+                                            Tag="{Binding}"
+                                            ToolTip="Click to view camera information"
+                                            HorizontalAlignment="Stretch"
+                                            VerticalAlignment="Stretch"
+                                            IsEnabled="{Binding CanShowCameraInfo}">
+                                        <Button.Style>
+                                            <Style TargetType="Button"
+                                                   BasedOn="{StaticResource StatusButtonStyle}">
+                                                <Style.Triggers>
+                                                    <!-- Disabled state -->
+                                                    <Trigger Property="IsEnabled"
+                                                             Value="False">
+                                                        <Setter Property="Background"
+                                                                Value="{StaticResource SEC_LightGrey}" />
+                                                        <Setter Property="Foreground"
+                                                                Value="{StaticResource SEC_MidGrey}" />
+                                                        <Setter Property="BorderBrush"
+                                                                Value="{StaticResource SEC_MidGrey}" />
+                                                    </Trigger>
+                                                    <!-- Enabled state with green color when camera info can be shown -->
+                                                    <DataTrigger Binding="{Binding CanShowCameraInfo}"
+                                                                 Value="True">
+                                                        <Setter Property="Background"
+                                                                Value="#FF4CAF50" />
+                                                        <Setter Property="Foreground"
+                                                                Value="White" />
+                                                        <Setter Property="BorderBrush"
+                                                                Value="#FF45A049" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
                         <!-- Status Column with button-like appearance -->
                         <DataGridTemplateColumn Header="Status"
@@ -478,8 +532,16 @@
                         Command="{Binding CheckCompatibilityCommand}"
                         Width="150"
                         Height="36"
-                        IsEnabled="{Binding IsCheckingCompatibility, Converter={StaticResource InverseBooleanConverter}}"
+                        Visibility="{Binding IsCheckingCompatibility, Converter={StaticResource InverseBooleanToVisibilityConverter}, ConverterParameter=Invert}"
                         Style="{StaticResource ModernButtonStyle}" />
+
+                <Button x:Name="cancelCompatibilityButton"
+                        Content="Cancel Check"
+                        Command="{Binding CancelCompatibilityCommand}"
+                        Width="150"
+                        Height="36"
+                        Visibility="{Binding IsCheckingCompatibility, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Style="{StaticResource CancelButtonStyle}" />
 
                 <Button x:Name="sendNetworkButton"
                         Content="Send Network"

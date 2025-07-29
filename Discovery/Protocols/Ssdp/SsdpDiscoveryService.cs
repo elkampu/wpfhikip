@@ -1,11 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 using wpfhikip.Discovery.Core;
 using wpfhikip.Discovery.Models;
@@ -14,13 +9,14 @@ namespace wpfhikip.Discovery.Protocols.Ssdp
 {
     /// <summary>
     /// SSDP (Simple Service Discovery Protocol) / UPnP discovery service
+    /// Enhanced to listen on all available network interfaces
     /// </summary>
     public class SsdpDiscoveryService : INetworkDiscoveryService, IDisposable
     {
         public string ServiceName => "SSDP/UPnP";
         public TimeSpan DefaultTimeout => TimeSpan.FromSeconds(30);
 
-        private UdpClient? _udpClient;
+        private readonly List<UdpClient> _udpClients = new();
         private bool _disposed = false;
 
         public event EventHandler<DeviceDiscoveredEventArgs>? DeviceDiscovered;
@@ -35,7 +31,7 @@ namespace wpfhikip.Discovery.Protocols.Ssdp
 
             try
             {
-                InitializeUdpClient();
+                InitializeMultiInterfaceClients();
 
                 var searchTargets = SsdpConstants.GetCommonSearchTargets();
                 var totalTargets = searchTargets.Length;
@@ -49,14 +45,22 @@ namespace wpfhikip.Discovery.Protocols.Ssdp
                     currentTarget++;
                     ReportProgress(currentTarget, totalTargets, searchTarget, $"Searching for {searchTarget}");
 
-                    var foundDevices = await PerformMSearchAsync(searchTarget, cancellationToken);
-                    devices.AddRange(foundDevices);
+                    var foundDevices = await PerformMultiInterfaceMSearchAsync(searchTarget, cancellationToken);
+
+                    // Deduplicate devices based on UniqueId
+                    foreach (var device in foundDevices)
+                    {
+                        if (!devices.Any(d => d.UniqueId == device.UniqueId))
+                        {
+                            devices.Add(device);
+                        }
+                    }
 
                     // Small delay between searches to avoid flooding the network
                     await Task.Delay(100, cancellationToken);
                 }
 
-                ReportProgress(totalTargets, totalTargets, "", "SSDP discovery completed");
+                ReportProgress(totalTargets, totalTargets, "", $"SSDP discovery completed. Found {devices.Count} unique devices.");
             }
             catch (OperationCanceledException)
             {
@@ -89,32 +93,139 @@ namespace wpfhikip.Discovery.Protocols.Ssdp
         }
 
         /// <summary>
-        /// Performs M-SEARCH for a specific device type
+        /// Initializes UDP clients for all available network interfaces
         /// </summary>
-        private async Task<List<DiscoveredDevice>> PerformMSearchAsync(string searchTarget, CancellationToken cancellationToken)
+        private void InitializeMultiInterfaceClients()
+        {
+            DisposeClients();
+
+            try
+            {
+                var interfaces = NetworkUtils.GetLocalNetworkInterfaces();
+                var multicastAddress = IPAddress.Parse(SsdpConstants.MulticastAddress);
+
+                ReportProgress(0, 0, "", $"Initializing SSDP clients on {interfaces.Count} network interfaces");
+
+                // Create a client for each network interface
+                foreach (var kvp in interfaces)
+                {
+                    var interfaceInfo = kvp.Value;
+
+                    foreach (var addressInfo in interfaceInfo.IPv4Addresses)
+                    {
+                        try
+                        {
+                            var udpClient = new UdpClient();
+                            udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+
+                            // Bind to the specific interface address
+                            udpClient.Client.Bind(new IPEndPoint(addressInfo.IPAddress, 0));
+
+                            // Join multicast group on this interface
+                            udpClient.JoinMulticastGroup(multicastAddress, addressInfo.IPAddress);
+
+                            _udpClients.Add(udpClient);
+
+                            ReportProgress(0, 0, "", $"SSDP client initialized on {addressInfo.IPAddress} ({interfaceInfo.Name})");
+                        }
+                        catch (Exception ex)
+                        {
+                            ReportProgress(0, 0, "", $"Failed to initialize SSDP client on {addressInfo.IPAddress}: {ex.Message}");
+                        }
+                    }
+                }
+
+                // Also create a general client bound to any address as fallback
+                try
+                {
+                    var generalClient = new UdpClient();
+                    generalClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                    generalClient.Client.Bind(new IPEndPoint(IPAddress.Any, 0));
+                    generalClient.JoinMulticastGroup(multicastAddress);
+                    _udpClients.Add(generalClient);
+
+                    ReportProgress(0, 0, "", "General SSDP client initialized (fallback)");
+                }
+                catch (Exception ex)
+                {
+                    ReportProgress(0, 0, "", $"Failed to initialize general SSDP client: {ex.Message}");
+                }
+
+                if (!_udpClients.Any())
+                {
+                    throw new InvalidOperationException("Failed to initialize any SSDP clients");
+                }
+            }
+            catch (Exception ex)
+            {
+                DisposeClients();
+                throw new InvalidOperationException($"Failed to initialize SSDP clients: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Performs M-SEARCH across all network interfaces
+        /// </summary>
+        private async Task<List<DiscoveredDevice>> PerformMultiInterfaceMSearchAsync(string searchTarget, CancellationToken cancellationToken)
         {
             var devices = new List<DiscoveredDevice>();
+            var multicastEndpoint = new IPEndPoint(IPAddress.Parse(SsdpConstants.MulticastAddress), SsdpConstants.MulticastPort);
 
-            if (_udpClient == null)
+            if (!_udpClients.Any())
                 return devices;
 
             try
             {
-                // Send M-SEARCH request
+                // Send M-SEARCH request from all clients simultaneously
                 var searchMessage = SsdpMessage.CreateMSearchRequest(searchTarget);
                 var searchBytes = Encoding.UTF8.GetBytes(searchMessage);
-                var multicastEndpoint = new IPEndPoint(IPAddress.Parse(SsdpConstants.MulticastAddress), SsdpConstants.MulticastPort);
 
-                await _udpClient.SendAsync(searchBytes, searchBytes.Length, multicastEndpoint);
-
-                // Listen for responses
-                var listenTimeout = DateTime.UtcNow.Add(TimeSpan.FromSeconds(5));
-
-                while (DateTime.UtcNow < listenTimeout && !cancellationToken.IsCancellationRequested)
+                var sendTasks = _udpClients.Select(async client =>
                 {
                     try
                     {
-                        var receiveTask = _udpClient.ReceiveAsync();
+                        await client.SendAsync(searchBytes, searchBytes.Length, multicastEndpoint);
+                    }
+                    catch (Exception ex)
+                    {
+                        ReportProgress(0, 0, "", $"Failed to send SSDP request from client: {ex.Message}");
+                    }
+                });
+
+                await Task.WhenAll(sendTasks);
+
+                // Listen for responses from all clients
+                var listenTimeout = DateTime.UtcNow.Add(TimeSpan.FromSeconds(8)); // Increased timeout for multi-interface
+                var receiveTasks = new List<Task>();
+
+                foreach (var client in _udpClients)
+                {
+                    var receiveTask = ListenForResponsesAsync(client, devices, listenTimeout, cancellationToken);
+                    receiveTasks.Add(receiveTask);
+                }
+
+                await Task.WhenAll(receiveTasks);
+            }
+            catch (Exception ex)
+            {
+                ReportProgress(0, 0, "", $"Error during multi-interface M-SEARCH: {ex.Message}");
+            }
+
+            return devices;
+        }
+
+        /// <summary>
+        /// Listens for SSDP responses on a specific client
+        /// </summary>
+        private async Task ListenForResponsesAsync(UdpClient client, List<DiscoveredDevice> devices, DateTime timeout, CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (DateTime.UtcNow < timeout && !cancellationToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        var receiveTask = client.ReceiveAsync();
                         var timeoutTask = Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
 
                         var completedTask = await Task.WhenAny(receiveTask, timeoutTask);
@@ -124,10 +235,17 @@ namespace wpfhikip.Discovery.Protocols.Ssdp
                             var result = await receiveTask;
                             var device = await ParseSsdpResponseAsync(result.Buffer, result.RemoteEndPoint);
 
-                            if (device != null && !devices.Any(d => d.UniqueId == device.UniqueId))
+                            if (device != null)
                             {
-                                devices.Add(device);
-                                DeviceDiscovered?.Invoke(this, new DeviceDiscoveredEventArgs(device, ServiceName));
+                                lock (devices)
+                                {
+                                    // Check for duplicates
+                                    if (!devices.Any(d => d.UniqueId == device.UniqueId))
+                                    {
+                                        devices.Add(device);
+                                        DeviceDiscovered?.Invoke(this, new DeviceDiscoveredEventArgs(device, ServiceName));
+                                    }
+                                }
                             }
                         }
                     }
@@ -139,14 +257,16 @@ namespace wpfhikip.Discovery.Protocols.Ssdp
                     {
                         break;
                     }
+                    catch (Exception)
+                    {
+                        // Continue listening despite individual errors
+                    }
                 }
             }
             catch (Exception)
             {
-                // Ignore individual search errors
+                // Ignore errors from individual clients
             }
-
-            return devices;
         }
 
         /// <summary>
@@ -275,29 +395,23 @@ namespace wpfhikip.Discovery.Protocols.Ssdp
         }
 
         /// <summary>
-        /// Initializes UDP client for SSDP communication
+        /// Disposes all UDP clients
         /// </summary>
-        private void InitializeUdpClient()
+        private void DisposeClients()
         {
-            if (_udpClient != null)
-                return;
-
-            try
+            foreach (var client in _udpClients)
             {
-                _udpClient = new UdpClient();
-                _udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                _udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, 0));
-
-                // Join multicast group for receiving responses
-                var multicastAddress = IPAddress.Parse(SsdpConstants.MulticastAddress);
-                _udpClient.JoinMulticastGroup(multicastAddress);
+                try
+                {
+                    client?.Close();
+                    client?.Dispose();
+                }
+                catch
+                {
+                    // Ignore disposal errors
+                }
             }
-            catch (Exception ex)
-            {
-                _udpClient?.Dispose();
-                _udpClient = null;
-                throw new InvalidOperationException($"Failed to initialize SSDP client: {ex.Message}", ex);
-            }
+            _udpClients.Clear();
         }
 
         /// <summary>
@@ -320,17 +434,8 @@ namespace wpfhikip.Discovery.Protocols.Ssdp
             {
                 if (disposing)
                 {
-                    try
-                    {
-                        _udpClient?.Close();
-                        _udpClient?.Dispose();
-                    }
-                    catch
-                    {
-                        // Ignore disposal errors
-                    }
+                    DisposeClients();
                 }
-
                 _disposed = true;
             }
         }

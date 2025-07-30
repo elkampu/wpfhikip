@@ -123,8 +123,8 @@ namespace wpfhikip.Models
         }
 
         // Optimized computed property
-        public string? ShortStatus => string.IsNullOrEmpty(_status) 
-            ? _status 
+        public string? ShortStatus => string.IsNullOrEmpty(_status)
+            ? _status
             : _status.Length > 10 ? string.Concat(_status.AsSpan(0, 7), "...") : _status;
 
 
@@ -239,6 +239,32 @@ namespace wpfhikip.Models
                 if (!string.Equals(Settings.DefaultGateway, value, StringComparison.Ordinal))
                 {
                     Settings.DefaultGateway = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public string? NewDNS1
+        {
+            get => Settings.DNS1;
+            set
+            {
+                if (!string.Equals(Settings.DNS1, value, StringComparison.Ordinal))
+                {
+                    Settings.DNS1 = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public string? NewDNS2
+        {
+            get => Settings.DNS2;
+            set
+            {
+                if (!string.Equals(Settings.DNS2, value, StringComparison.Ordinal))
+                {
+                    Settings.DNS2 = value;
                     OnPropertyChanged();
                 }
             }

@@ -1,13 +1,14 @@
-﻿<Application x:Class="wpfhikip.App"  
-            xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"  
-            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"  
-            xmlns:local="clr-namespace:wpfhikip"
+﻿<Application x:Class="wpfhikip.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:wpfhikip"
              xmlns:converters="clr-namespace:wpfhikip.Converters"
              StartupUri="MainWindowV2.xaml">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Resources/SECColors.xaml" />
+                <ResourceDictionary Source="Resources/Styles/NetConfStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Converters -->

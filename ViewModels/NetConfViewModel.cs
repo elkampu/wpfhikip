@@ -371,7 +371,7 @@ namespace wpfhikip.ViewModels
                 camera.AddProtocolLog("System", "Network Config",
                     $"Starting network configuration for {camera.CurrentIP}:{camera.EffectivePort}");
                 camera.AddProtocolLog("System", "Config Values",
-                    $"NewIP: {camera.NewIP}, NewMask: {camera.NewMask}, NewGateway: {camera.NewGateway}");
+                    $"NewIP: {camera.NewIP}, NewMask: {camera.NewMask}, NewGateway: {camera.NewGateway}, DNS1: {camera.NewDNS1}, DNS2: {camera.NewDNS2}");
 
                 bool success = await ProtocolManager.SendNetworkConfigAsync(camera);
 

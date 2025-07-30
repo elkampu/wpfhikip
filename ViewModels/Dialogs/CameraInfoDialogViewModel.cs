@@ -46,12 +46,14 @@ namespace wpfhikip.ViewModels.Dialogs
         private string _dns1 = string.Empty;
         private string _dns2 = string.Empty;
 
-        // Video Stream Information
+        // Video Stream Information Properties
         private string _mainStream = string.Empty;
         private string _subStream = string.Empty;
         private string _resolution = string.Empty;
         private string _frameRate = string.Empty;
         private string _bitRate = string.Empty;
+        private string _codecType = string.Empty;
+        private string _qualityControlType = string.Empty;
 
         public CameraInfoDialogViewModel(Camera camera)
         {
@@ -221,6 +223,17 @@ namespace wpfhikip.ViewModels.Dialogs
             private set => SetProperty(ref _bitRate, value);
         }
 
+        public string CodecType
+        {
+            get => _codecType;
+            private set => SetProperty(ref _codecType, value);
+        }
+
+        public string QualityControlType
+        {
+            get => _qualityControlType;
+            private set => SetProperty(ref _qualityControlType, value);
+        }
         // Commands
         public ICommand RefreshCommand { get; }
         public ICommand CancelCommand { get; }
@@ -273,7 +286,9 @@ namespace wpfhikip.ViewModels.Dialogs
                 sb.AppendLine("------------------------");
                 sb.AppendLine($"Main Stream: {MainStream}");
                 sb.AppendLine($"Sub Stream: {SubStream}");
+                sb.AppendLine($"Codec Type: {CodecType}");
                 sb.AppendLine($"Resolution: {Resolution}");
+                sb.AppendLine($"Quality Control: {QualityControlType}");
                 sb.AppendLine($"Frame Rate: {FrameRate}");
                 sb.AppendLine($"Bit Rate: {BitRate}");
                 sb.AppendLine();
@@ -292,7 +307,6 @@ namespace wpfhikip.ViewModels.Dialogs
                 _camera.AddProtocolLog("Info Dialog", "Copy", $"Failed to copy information: {ex.Message}", ProtocolLogLevel.Error);
             }
         }
-
         /// <summary>
         /// Loads camera information from the device using generic ProtocolManager methods
         /// </summary>
@@ -413,6 +427,8 @@ namespace wpfhikip.ViewModels.Dialogs
             Resolution = _camera.VideoStream?.Resolution ?? "Not detected";
             FrameRate = _camera.VideoStream?.FrameRate ?? "Not detected";
             BitRate = _camera.VideoStream?.BitRate ?? "Not detected";
+            CodecType = _camera.VideoStream?.CodecType ?? "Not detected";
+            QualityControlType = _camera.VideoStream?.QualityControlType ?? "Not detected";
         }
 
         private void InitializeBasicInfo()

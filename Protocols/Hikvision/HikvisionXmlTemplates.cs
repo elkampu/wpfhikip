@@ -280,9 +280,9 @@ namespace wpfhikip.Protocols.Hikvision
                 {
                     var ipElements = doc.Descendants()
                         .Where(e => e.Name.LocalName == "ipAddress" &&
-                               e.Parent?.Name.LocalName != "DefaultGateway" &&
-                               e.Parent?.Name.LocalName != "PrimaryDNS" &&
-                               e.Parent?.Name.LocalName != "SecondaryDNS");
+                                   e.Parent?.Name.LocalName != "DefaultGateway" &&
+                                   e.Parent?.Name.LocalName != "PrimaryDNS" &&
+                                   e.Parent?.Name.LocalName != "SecondaryDNS");
 
                     foreach (var ipElement in ipElements)
                     {
@@ -323,6 +323,36 @@ namespace wpfhikip.Protocols.Hikvision
                     }
                 }
 
+                // Handle Primary DNS (nested structure)
+                if (!string.IsNullOrEmpty(camera.NewDNS1))
+                {
+                    var primaryDnsElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "PrimaryDNS");
+                    if (primaryDnsElement != null)
+                    {
+                        var dnsIpElement = primaryDnsElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "ipAddress");
+                        if (dnsIpElement != null)
+                        {
+                            dnsIpElement.Value = camera.NewDNS1;
+                            modified = true;
+                        }
+                    }
+                }
+
+                // Handle Secondary DNS (nested structure)
+                if (!string.IsNullOrEmpty(camera.NewDNS2))
+                {
+                    var secondaryDnsElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "SecondaryDNS");
+                    if (secondaryDnsElement != null)
+                    {
+                        var dnsIpElement = secondaryDnsElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "ipAddress");
+                        if (dnsIpElement != null)
+                        {
+                            dnsIpElement.Value = camera.NewDNS2;
+                            modified = true;
+                        }
+                    }
+                }
+
                 return modified ? doc.ToString() : originalXml;
             }
             catch (Exception)
@@ -339,7 +369,6 @@ namespace wpfhikip.Protocols.Hikvision
                 return ModifyXmlTemplate(originalXml, newValues);
             }
         }
-
         private static string ModifyTimeXml(string originalXml, Camera camera)
         {
             var newValues = new Dictionary<string, string>
@@ -414,9 +443,18 @@ namespace wpfhikip.Protocols.Hikvision
                 currentValues.GetValueOrDefault("defaultGateway") != camera.NewGateway)
                 return true;
 
+            // Check if Primary DNS changed
+            if (!string.IsNullOrEmpty(camera.NewDNS1) &&
+                currentValues.GetValueOrDefault("primaryDNS") != camera.NewDNS1)
+                return true;
+
+            // Check if Secondary DNS changed
+            if (!string.IsNullOrEmpty(camera.NewDNS2) &&
+                currentValues.GetValueOrDefault("secondaryDNS") != camera.NewDNS2)
+                return true;
+
             return false;
         }
-
         private static bool HasNtpConfigChanged(Dictionary<string, string> currentValues, Camera camera)
         {
             return currentValues.GetValueOrDefault("ipAddress") != camera.NewNTPServer;

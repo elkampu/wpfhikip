@@ -733,6 +733,8 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0"
@@ -755,27 +757,45 @@
 
                             <TextBlock Grid.Row="2"
                                        Grid.Column="0"
-                                       Text="Resolution:"
+                                       Text="Codec Type:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
                             <TextBox Grid.Row="2"
                                      Grid.Column="1"
-                                     Text="{Binding Resolution, Mode=OneWay}"
+                                     Text="{Binding CodecType, Mode=OneWay}"
                                      Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="3"
                                        Grid.Column="0"
-                                       Text="Frame Rate:"
+                                       Text="Resolution:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
                             <TextBox Grid.Row="3"
                                      Grid.Column="1"
-                                     Text="{Binding FrameRate, Mode=OneWay}"
+                                     Text="{Binding Resolution, Mode=OneWay}"
                                      Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="4"
                                        Grid.Column="0"
-                                       Text="Bit Rate:"
+                                       Text="Quality Control:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
                             <TextBox Grid.Row="4"
+                                     Grid.Column="1"
+                                     Text="{Binding QualityControlType, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
+
+                            <TextBlock Grid.Row="5"
+                                       Grid.Column="0"
+                                       Text="Frame Rate:"
+                                       Style="{StaticResource LabelTextBlockStyle}" />
+                            <TextBox Grid.Row="5"
+                                     Grid.Column="1"
+                                     Text="{Binding FrameRate, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
+
+                            <TextBlock Grid.Row="6"
+                                       Grid.Column="0"
+                                       Text="Bit Rate:"
+                                       Style="{StaticResource LabelTextBlockStyle}" />
+                            <TextBox Grid.Row="6"
                                      Grid.Column="1"
                                      Text="{Binding BitRate, Mode=OneWay}"
                                      Style="{StaticResource SelectableValueTextStyle}" />

@@ -7,6 +7,8 @@
         private string? _resolution;
         private string? _frameRate;
         private string? _bitRate;
+        private string? _codecType;
+        private string? _qualityControlType;
 
         public string? MainStreamUrl
         {
@@ -36,6 +38,18 @@
         {
             get => _bitRate;
             set => SetProperty(ref _bitRate, value);
+        }
+
+        public string? CodecType
+        {
+            get => _codecType;
+            set => SetProperty(ref _codecType, value);
+        }
+
+        public string? QualityControlType
+        {
+            get => _qualityControlType;
+            set => SetProperty(ref _qualityControlType, value);
         }
     }
 }

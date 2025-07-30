@@ -332,7 +332,6 @@ namespace wpfhikip.Protocols.Common
                     camera.VideoStream.SubStreamUrl = $"rtsp://{camera.CurrentIP}/stream2";
             }
         }
-
         /// <summary>
         /// Sends network configuration to a camera
         /// </summary>
@@ -365,11 +364,13 @@ namespace wpfhikip.Protocols.Common
                 {
                     IPAddress = camera.NewIP,
                     SubnetMask = camera.NewMask,
-                    DefaultGateway = camera.NewGateway
+                    DefaultGateway = camera.NewGateway,
+                    DNS1 = camera.NewDNS1,  // Added DNS1
+                    DNS2 = camera.NewDNS2   // Added DNS2
                 };
 
                 camera.AddProtocolLog(camera.Protocol.ToString(), "Network Config",
-                    $"Sending configuration: IP={config.IPAddress}, Mask={config.SubnetMask}, Gateway={config.DefaultGateway}");
+                    $"Sending configuration: IP={config.IPAddress}, Mask={config.SubnetMask}, Gateway={config.DefaultGateway}, DNS1={config.DNS1}, DNS2={config.DNS2}");
 
                 // For Hikvision, use the specialized configuration method that logs to the camera
                 if (camera.Protocol == CameraProtocol.Hikvision)
@@ -547,14 +548,87 @@ namespace wpfhikip.Protocols.Common
             camera.VideoStream.MainStreamUrl = hikvisionOperation.GetRtspStreamUrl(1, 1);
             camera.VideoStream.SubStreamUrl = hikvisionOperation.GetRtspStreamUrl(1, 2);
 
-            // Get camera status for video information
-            var (success, status, error) = await hikvisionOperation.GetCameraStatusAsync();
-            if (success && status.Count > 0)
+            // Get detailed streaming channel information
+            var (streamSuccess, streamingInfo, streamError) = await hikvisionOperation.GetStreamingChannelInfoAsync(1);
+            if (streamSuccess && streamingInfo.Count > 0)
+            {
+                camera.AddProtocolLog("Hikvision", "Video Stream Info",
+                    $"Retrieved {streamingInfo.Count} streaming parameters", ProtocolLogLevel.Info);
+                UpdateCameraVideoInfoFromStreaming(camera, streamingInfo);
+            }
+            else
+            {
+                camera.AddProtocolLog("Hikvision", "Video Stream Info",
+                    $"Failed to get streaming info: {streamError}", ProtocolLogLevel.Warning);
+            }
+
+            // Also try to get camera status for additional video information
+            var (statusSuccess, status, statusError) = await hikvisionOperation.GetCameraStatusAsync();
+            if (statusSuccess && status.Count > 0)
             {
                 UpdateCameraVideoInfo(camera, status);
             }
         }
+        private static void UpdateCameraVideoInfoFromStreaming(Camera camera, Dictionary<string, string> streamingInfo)
+        {
+            // Ensure VideoStream is initialized
+            camera.VideoStream ??= new CameraVideoStream();
 
+            // Extract codec type
+            var codecType = GetValueOrDefault(streamingInfo, "videoCodecType", null);
+            if (!string.IsNullOrWhiteSpace(codecType))
+                camera.VideoStream.CodecType = codecType;
+
+            // Extract video resolution (combine width and height)
+            var resolutionWidth = GetValueOrDefault(streamingInfo, "videoResolutionWidth", null);
+            var resolutionHeight = GetValueOrDefault(streamingInfo, "videoResolutionHeight", null);
+            if (!string.IsNullOrWhiteSpace(resolutionWidth) && !string.IsNullOrWhiteSpace(resolutionHeight))
+            {
+                camera.VideoStream.Resolution = $"{resolutionWidth}x{resolutionHeight}";
+            }
+
+            // Extract quality control type
+            var qualityControlType = GetValueOrDefault(streamingInfo, "videoQualityControlType", null);
+            if (!string.IsNullOrWhiteSpace(qualityControlType))
+                camera.VideoStream.QualityControlType = qualityControlType;
+
+            // Extract frame rate (convert from hundreds to fps)
+            var maxFrameRate = GetValueOrDefault(streamingInfo, "maxFrameRate", null);
+            if (!string.IsNullOrWhiteSpace(maxFrameRate) && int.TryParse(maxFrameRate, out var frameRateValue))
+            {
+                // Hikvision returns frame rate in hundredths (e.g., 2500 = 25.00 fps)
+                var fps = frameRateValue / 100.0;
+                camera.VideoStream.FrameRate = $"{fps:F1} fps";
+            }
+
+            // Extract bit rate
+            var constantBitRate = GetValueOrDefault(streamingInfo, "constantBitRate", null);
+            var vbrUpperCap = GetValueOrDefault(streamingInfo, "vbrUpperCap", null);
+
+            string bitRateDisplay = null;
+            if (qualityControlType == "CBR" && !string.IsNullOrWhiteSpace(constantBitRate))
+            {
+                bitRateDisplay = $"{constantBitRate} kbps (CBR)";
+            }
+            else if (qualityControlType == "VBR" && !string.IsNullOrWhiteSpace(vbrUpperCap))
+            {
+                var vbrLowerCap = GetValueOrDefault(streamingInfo, "vbrLowerCap", "32");
+                bitRateDisplay = $"{vbrLowerCap}-{vbrUpperCap} kbps (VBR)";
+            }
+            else if (!string.IsNullOrWhiteSpace(constantBitRate))
+            {
+                bitRateDisplay = $"{constantBitRate} kbps";
+            }
+
+            if (!string.IsNullOrWhiteSpace(bitRateDisplay))
+                camera.VideoStream.BitRate = bitRateDisplay;
+
+            // Log the extracted values
+            camera.AddProtocolLog("Hikvision", "Video Parameters",
+                $"Codec: {codecType}, Resolution: {camera.VideoStream.Resolution}, Quality: {qualityControlType}, " +
+                $"FrameRate: {camera.VideoStream.FrameRate}, BitRate: {camera.VideoStream.BitRate}",
+                ProtocolLogLevel.Info);
+        }
         private static async Task LoadAxisVideoInfoAsync(
             Camera camera,
             AxisConnection connection,

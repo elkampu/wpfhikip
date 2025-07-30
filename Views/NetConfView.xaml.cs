@@ -31,9 +31,10 @@ namespace wpfhikip.Views
             {
                 var columnHeader = templateColumn.Header?.ToString();
 
-                // Check if this is one of the IP Address columns
+                // Check if this is one of the IP Address columns (including DNS1 and DNS2)
                 if (columnHeader == "Current IP" || columnHeader == "New IP" ||
-                    columnHeader == "Mask" || columnHeader == "Gateway" || columnHeader == "NTP")
+                    columnHeader == "Mask" || columnHeader == "Gateway" ||
+                    columnHeader == "DNS1" || columnHeader == "DNS2" || columnHeader == "NTP")
                 {
                     // Use dispatcher to ensure the edit template is loaded before trying to find the control
                     Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
@@ -166,6 +167,8 @@ namespace wpfhikip.Views
                 "New IP" => camera.NewIP,
                 "Mask" => camera.NewMask,
                 "Gateway" => camera.NewGateway,
+                "DNS1" => camera.NewDNS1,
+                "DNS2" => camera.NewDNS2,
                 "NTP" => camera.NewNTPServer,
                 _ => string.Empty
             };
@@ -202,7 +205,8 @@ namespace wpfhikip.Views
         private bool IsIpAddressColumn(string columnHeader)
         {
             return columnHeader == "Current IP" || columnHeader == "New IP" ||
-                   columnHeader == "Mask" || columnHeader == "Gateway" || columnHeader == "NTP";
+                   columnHeader == "Mask" || columnHeader == "Gateway" ||
+                   columnHeader == "DNS1" || columnHeader == "DNS2" || columnHeader == "NTP";
         }
 
         private void PasteIpAddress(string clipboardText, string columnHeader, Camera camera)
@@ -240,6 +244,12 @@ namespace wpfhikip.Views
                     break;
                 case "Gateway":
                     camera.NewGateway = extractedIp;
+                    break;
+                case "DNS1":
+                    camera.NewDNS1 = extractedIp;
+                    break;
+                case "DNS2":
+                    camera.NewDNS2 = extractedIp;
                     break;
                 case "NTP":
                     camera.NewNTPServer = extractedIp;

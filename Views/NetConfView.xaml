@@ -21,278 +21,6 @@
         <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
         <converters:EnumToStringConverter x:Key="EnumToStringConverter" />
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-
-        <!-- Modern Card Style -->
-        <Style x:Key="ModernCardStyle"
-               TargetType="Border">
-            <Setter Property="Background"
-                    Value="{StaticResource SEC_White}" />
-            <Setter Property="BorderBrush"
-                    Value="{StaticResource SEC_LightGrey}" />
-            <Setter Property="BorderThickness"
-                    Value="1" />
-            <Setter Property="CornerRadius"
-                    Value="8" />
-            <Setter Property="Padding"
-                    Value="16" />
-            <Setter Property="Margin"
-                    Value="8" />
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="8"
-                                      ShadowDepth="2"
-                                      Opacity="0.1" />
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Modern Button Style -->
-        <Style x:Key="ModernButtonStyle"
-               TargetType="Button">
-            <Setter Property="BorderThickness"
-                    Value="0" />
-            <Setter Property="Padding"
-                    Value="12,8" />
-            <Setter Property="Margin"
-                    Value="4" />
-            <Setter Property="FontWeight"
-                    Value="Medium" />
-            <Setter Property="FontSize"
-                    Value="14" />
-            <Setter Property="Cursor"
-                    Value="Hand" />
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="4"
-                                      ShadowDepth="1"
-                                      Opacity="0.2" />
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver"
-                         Value="True">
-                    <Setter Property="Opacity"
-                            Value="0.9" />
-                </Trigger>
-                <Trigger Property="IsPressed"
-                         Value="True">
-                    <Setter Property="RenderTransform">
-                        <Setter.Value>
-                            <ScaleTransform ScaleX="0.98"
-                                            ScaleY="0.98" />
-                        </Setter.Value>
-                    </Setter>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- Primary Button Style -->
-        <Style x:Key="PrimaryButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource ModernButtonStyle}">
-            <Setter Property="Background"
-                    Value="{StaticResource SEC_MidBlue}" />
-            <Setter Property="Foreground"
-                    Value="{StaticResource SEC_White}" />
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver"
-                         Value="True">
-                    <Setter Property="Background"
-                            Value="{StaticResource SEC_LightBlue}" />
-                </Trigger>
-                <Trigger Property="IsPressed"
-                         Value="True">
-                    <Setter Property="Background"
-                            Value="{StaticResource SEC_NavyBlue}" />
-                </Trigger>
-                <Trigger Property="IsEnabled"
-                         Value="False">
-                    <Setter Property="Background"
-                            Value="{StaticResource SEC_LightGrey}" />
-                    <Setter Property="Foreground"
-                            Value="{StaticResource SEC_MidGrey}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- Success Button Style -->
-        <Style x:Key="SuccessButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource ModernButtonStyle}">
-            <Setter Property="Background"
-                    Value="#16a34a" />
-            <Setter Property="Foreground"
-                    Value="White" />
-        </Style>
-
-        <!-- Danger Button Style -->
-        <Style x:Key="DangerButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource ModernButtonStyle}">
-            <Setter Property="Background"
-                    Value="{StaticResource SEC_InfoRed}" />
-            <Setter Property="Foreground"
-                    Value="White" />
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver"
-                         Value="True">
-                    <Setter Property="Background"
-                            Value="{StaticResource SEC_MidRed}" />
-                </Trigger>
-                <Trigger Property="IsPressed"
-                         Value="True">
-                    <Setter Property="Background"
-                            Value="{StaticResource SEC_DarkRed}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- Secondary Button Style -->
-        <Style x:Key="SecondaryButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource ModernButtonStyle}">
-            <Setter Property="Background"
-                    Value="{StaticResource SEC_MidGrey}" />
-            <Setter Property="Foreground"
-                    Value="White" />
-        </Style>
-
-        <!-- Section Title Style -->
-        <Style x:Key="SectionTitleStyle"
-               TargetType="TextBlock">
-            <Setter Property="FontWeight"
-                    Value="Bold" />
-            <Setter Property="FontSize"
-                    Value="16" />
-            <Setter Property="Foreground"
-                    Value="{StaticResource SEC_DarkGrey}" />
-            <Setter Property="Margin"
-                    Value="0,0,0,12" />
-        </Style>
-
-        <!-- Modern DataGrid Style -->
-        <Style x:Key="ModernDataGridStyle"
-               TargetType="DataGrid">
-            <Setter Property="Background"
-                    Value="{StaticResource SEC_White}" />
-            <Setter Property="BorderBrush"
-                    Value="{StaticResource SEC_LightGrey}" />
-            <Setter Property="BorderThickness"
-                    Value="1" />
-            <Setter Property="GridLinesVisibility"
-                    Value="Horizontal" />
-            <Setter Property="HorizontalGridLinesBrush"
-                    Value="#f3f4f6" />
-            <Setter Property="HeadersVisibility"
-                    Value="Column" />
-            <Setter Property="AutoGenerateColumns"
-                    Value="False" />
-            <Setter Property="CanUserAddRows"
-                    Value="False" />
-            <Setter Property="CanUserDeleteRows"
-                    Value="False" />
-            <Setter Property="AlternatingRowBackground"
-                    Value="#f9fafb" />
-            <Setter Property="RowHeight"
-                    Value="32" />
-            <Setter Property="CanUserSortColumns"
-                    Value="False" />
-            <Setter Property="CanUserResizeColumns"
-                    Value="False" />
-            <Setter Property="CanUserReorderColumns"
-                    Value="False" />
-            <Setter Property="SelectionUnit"
-                    Value="Cell" />
-            <Setter Property="ClipboardCopyMode"
-                    Value="ExcludeHeader" />
-        </Style>
-
-        <!-- Status Button Style for DataGrid cells -->
-        <Style x:Key="StatusButtonStyle"
-               TargetType="Button">
-            <Setter Property="Background"
-                    Value="{Binding CellColor}" />
-            <Setter Property="Foreground"
-                    Value="Black" />
-            <Setter Property="BorderThickness"
-                    Value="1" />
-            <Setter Property="BorderBrush"
-                    Value="{StaticResource SEC_MidGrey}" />
-            <Setter Property="FontWeight"
-                    Value="Medium" />
-            <Setter Property="FontSize"
-                    Value="10" />
-            <Setter Property="Cursor"
-                    Value="Hand" />
-            <Setter Property="Margin"
-                    Value="2" />
-            <Setter Property="Padding"
-                    Value="4,2" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                CornerRadius="4"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                BorderBrush="{TemplateBinding BorderBrush}">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}"
-                                              TextElement.Foreground="{TemplateBinding Foreground}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <!-- Specific triggers for different background colors to ensure readability -->
-                            <DataTrigger Binding="{Binding CellColor}"
-                                         Value="{x:Static Brushes.LightYellow}">
-                                <Setter Property="Foreground"
-                                        Value="Black" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding CellColor}"
-                                         Value="{x:Static Brushes.LightGreen}">
-                                <Setter Property="Foreground"
-                                        Value="Black" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding CellColor}"
-                                         Value="{x:Static Brushes.Orange}">
-                                <Setter Property="Foreground"
-                                        Value="Black" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding CellColor}"
-                                         Value="{x:Static Brushes.LightCoral}">
-                                <Setter Property="Foreground"
-                                        Value="Black" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding CellColor}"
-                                         Value="{x:Static Brushes.LightGray}">
-                                <Setter Property="Foreground"
-                                        Value="Black" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding CellColor}"
-                                         Value="{x:Static Brushes.Red}">
-                                <Setter Property="Foreground"
-                                        Value="White" />
-                            </DataTrigger>
-
-                            <!-- Hover effects -->
-                            <Trigger Property="IsMouseOver"
-                                     Value="True">
-                                <Setter Property="BorderBrush"
-                                        Value="{StaticResource SEC_DarkGrey}" />
-                                <Setter Property="BorderThickness"
-                                        Value="2" />
-                            </Trigger>
-                            <Trigger Property="IsPressed"
-                                     Value="True">
-                                <Setter Property="BorderBrush"
-                                        Value="{StaticResource SEC_DarkGrey}" />
-                                <Setter Property="BorderThickness"
-                                        Value="2" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Resources>
 
     <Grid Background="#f8fafc">
@@ -356,7 +84,7 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Column="0"
-                                   Text="Camera Configuration"
+                                   Text="Cameras"
                                    Style="{StaticResource SectionTitleStyle}"
                                    Margin="0" />
 
@@ -486,7 +214,7 @@
                                 </DataGridTextColumn>
 
                                 <!-- New IP with custom IP control -->
-                                <DataGridTemplateColumn Header="New IP"
+                                <DataGridTemplateColumn Header="Target IP"
                                                         Width="110"
                                                         MinWidth="110"
                                                         MaxWidth="110">
@@ -506,7 +234,7 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- New Mask with custom IP control -->
-                                <DataGridTemplateColumn Header="Mask"
+                                <DataGridTemplateColumn Header="Target Mask"
                                                         Width="110"
                                                         MinWidth="110"
                                                         MaxWidth="110">
@@ -526,7 +254,7 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- New Gateway with custom IP control -->
-                                <DataGridTemplateColumn Header="Gateway"
+                                <DataGridTemplateColumn Header="Target Gateway"
                                                         Width="110"
                                                         MinWidth="110"
                                                         MaxWidth="110">
@@ -541,6 +269,46 @@
                                     <DataGridTemplateColumn.CellEditingTemplate>
                                         <DataTemplate>
                                             <controls:IpAddressControl IpAddress="{Binding NewGateway, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellEditingTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- DNS1 with custom IP control -->
+                                <DataGridTemplateColumn Header="Target Primary DNS"
+                                                        Width="110"
+                                                        MinWidth="110"
+                                                        MaxWidth="110">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding NewDNS1}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="12" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                    <DataGridTemplateColumn.CellEditingTemplate>
+                                        <DataTemplate>
+                                            <controls:IpAddressControl IpAddress="{Binding NewDNS1, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellEditingTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- DNS2 with custom IP control -->
+                                <DataGridTemplateColumn Header="Target Secondary DNS"
+                                                        Width="110"
+                                                        MinWidth="110"
+                                                        MaxWidth="110">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding NewDNS2}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="12" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                    <DataGridTemplateColumn.CellEditingTemplate>
+                                        <DataTemplate>
+                                            <controls:IpAddressControl IpAddress="{Binding NewDNS2, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellEditingTemplate>
                                 </DataGridTemplateColumn>
@@ -602,7 +370,7 @@
                                 </DataGridTextColumn>
 
                                 <!-- Net Info Column -->
-                                <DataGridTemplateColumn Header="Net"
+                                <DataGridTemplateColumn Header="Info"
                                                         Width="70"
                                                         MinWidth="70"
                                                         MaxWidth="70"
@@ -649,7 +417,7 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- Status Column with button-like appearance -->
-                                <DataGridTemplateColumn Header="Status"
+                                <DataGridTemplateColumn Header="Detailed status"
                                                         Width="90"
                                                         MinWidth="90"
                                                         MaxWidth="90"

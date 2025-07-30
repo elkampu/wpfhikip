@@ -6,22 +6,165 @@
         xmlns:converters="clr-namespace:wpfhikip.Converters"
         mc:Ignorable="d"
         Title="Camera Information"
-        Height="650"
-        Width="700"
+        Height="900"
+        Width="1000"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
-        Background="#FF2D2D30"
-        MinHeight="500"
-        MinWidth="600">
+        MinHeight="600"
+        MinWidth="800">
     <Window.Resources>
+        <!-- Converters -->
         <converters:EnumToStringConverter x:Key="EnumToStringConverter" />
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
 
+        <!-- Modern Card Style -->
+        <Style x:Key="ModernCardStyle"
+               TargetType="Border">
+            <Setter Property="Background"
+                    Value="{StaticResource SEC_White}" />
+            <Setter Property="BorderBrush"
+                    Value="{StaticResource SEC_LightGrey}" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="CornerRadius"
+                    Value="8" />
+            <Setter Property="Padding"
+                    Value="16" />
+            <Setter Property="Margin"
+                    Value="8" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="8"
+                                      ShadowDepth="2"
+                                      Opacity="0.1" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Modern Button Styles -->
+        <Style x:Key="ModernButtonStyle"
+               TargetType="Button">
+            <Setter Property="BorderThickness"
+                    Value="0" />
+            <Setter Property="Padding"
+                    Value="12,8" />
+            <Setter Property="Margin"
+                    Value="4" />
+            <Setter Property="FontWeight"
+                    Value="Medium" />
+            <Setter Property="FontSize"
+                    Value="14" />
+            <Setter Property="Cursor"
+                    Value="Hand" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="4"
+                                      ShadowDepth="1"
+                                      Opacity="0.2" />
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver"
+                         Value="True">
+                    <Setter Property="Opacity"
+                            Value="0.9" />
+                </Trigger>
+                <Trigger Property="IsPressed"
+                         Value="True">
+                    <Setter Property="RenderTransform">
+                        <Setter.Value>
+                            <ScaleTransform ScaleX="0.98"
+                                            ScaleY="0.98" />
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PrimaryButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ModernButtonStyle}">
+            <Setter Property="Background"
+                    Value="{StaticResource SEC_MidBlue}" />
+            <Setter Property="Foreground"
+                    Value="{StaticResource SEC_White}" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver"
+                         Value="True">
+                    <Setter Property="Background"
+                            Value="{StaticResource SEC_LightBlue}" />
+                </Trigger>
+                <Trigger Property="IsPressed"
+                         Value="True">
+                    <Setter Property="Background"
+                            Value="{StaticResource SEC_NavyBlue}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SuccessButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ModernButtonStyle}">
+            <Setter Property="Background"
+                    Value="#16a34a" />
+            <Setter Property="Foreground"
+                    Value="White" />
+        </Style>
+
+        <Style x:Key="DangerButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ModernButtonStyle}">
+            <Setter Property="Background"
+                    Value="#dc2626" />
+            <Setter Property="Foreground"
+                    Value="White" />
+        </Style>
+
+        <Style x:Key="SecondaryButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ModernButtonStyle}">
+            <Setter Property="Background"
+                    Value="{StaticResource SEC_MidGrey}" />
+            <Setter Property="Foreground"
+                    Value="White" />
+        </Style>
+
+        <!-- Section Title Style -->
+        <Style x:Key="SectionTitleStyle"
+               TargetType="TextBlock">
+            <Setter Property="FontWeight"
+                    Value="Bold" />
+            <Setter Property="FontSize"
+                    Value="16" />
+            <Setter Property="Foreground"
+                    Value="{StaticResource SEC_DarkGrey}" />
+            <Setter Property="Margin"
+                    Value="0,0,0,12" />
+        </Style>
+
+        <!-- Stats Card Style -->
+        <Style x:Key="StatsCardStyle"
+               TargetType="Border">
+            <Setter Property="Background"
+                    Value="{StaticResource SEC_White}" />
+            <Setter Property="BorderBrush"
+                    Value="{StaticResource SEC_LightGrey}" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="CornerRadius"
+                    Value="6" />
+            <Setter Property="Padding"
+                    Value="16" />
+            <Setter Property="Margin"
+                    Value="4" />
+        </Style>
+
+        <!-- Modern Text Styles -->
         <Style x:Key="ModernTextBlockStyle"
                TargetType="TextBlock">
             <Setter Property="Foreground"
-                    Value="White" />
+                    Value="{StaticResource SEC_DarkGrey}" />
             <Setter Property="FontFamily"
                     Value="Segoe UI" />
             <Setter Property="FontSize"
@@ -32,11 +175,24 @@
                TargetType="TextBlock"
                BasedOn="{StaticResource ModernTextBlockStyle}">
             <Setter Property="FontSize"
-                    Value="18" />
+                    Value="24" />
             <Setter Property="FontWeight"
                     Value="Bold" />
             <Setter Property="Margin"
-                    Value="0,0,0,15" />
+                    Value="0,0,0,8" />
+            <Setter Property="Foreground"
+                    Value="{StaticResource SEC_DarkGrey}" />
+        </Style>
+
+        <Style x:Key="SubHeaderTextBlockStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource ModernTextBlockStyle}">
+            <Setter Property="FontSize"
+                    Value="14" />
+            <Setter Property="Foreground"
+                    Value="{StaticResource SEC_MidGrey}" />
+            <Setter Property="Margin"
+                    Value="0,0,0,0" />
         </Style>
 
         <Style x:Key="SectionHeaderStyle"
@@ -49,7 +205,7 @@
             <Setter Property="Margin"
                     Value="0,0,0,10" />
             <Setter Property="Foreground"
-                    Value="#FF4A9EFF" />
+                    Value="{StaticResource SEC_DarkGrey}" />
         </Style>
 
         <Style x:Key="LabelTextBlockStyle"
@@ -63,56 +219,60 @@
                     Value="0,0,10,5" />
             <Setter Property="VerticalAlignment"
                     Value="Top" />
+            <Setter Property="Foreground"
+                    Value="{StaticResource SEC_MidGrey}" />
         </Style>
 
-        <Style x:Key="ValueTextBlockStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource ModernTextBlockStyle}">
+        <!-- Selectable Text Style for values -->
+        <Style x:Key="SelectableValueTextStyle"
+               TargetType="TextBox">
             <Setter Property="FontSize"
                     Value="11" />
             <Setter Property="FontFamily"
                     Value="Consolas" />
             <Setter Property="Margin"
                     Value="0,0,0,5" />
-            <Setter Property="TextWrapping"
-                    Value="Wrap" />
-        </Style>
-
-        <Style x:Key="CloseButtonStyle"
-               TargetType="Button">
-            <Setter Property="Background"
-                    Value="#FF007ACC" />
             <Setter Property="Foreground"
-                    Value="White" />
+                    Value="{StaticResource SEC_DarkGrey}" />
+            <Setter Property="Background"
+                    Value="Transparent" />
             <Setter Property="BorderThickness"
                     Value="0" />
-            <Setter Property="FontWeight"
-                    Value="Medium" />
-            <Setter Property="FontSize"
-                    Value="12" />
+            <Setter Property="IsReadOnly"
+                    Value="True" />
+            <Setter Property="IsTabStop"
+                    Value="False" />
+            <Setter Property="TextWrapping"
+                    Value="Wrap" />
             <Setter Property="Cursor"
-                    Value="Hand" />
+                    Value="IBeam" />
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="Button">
+                    <ControlTemplate TargetType="TextBox">
                         <Border Background="{TemplateBinding Background}"
-                                CornerRadius="4"
+                                BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                BorderBrush="{TemplateBinding BorderBrush}">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              Margin="{TemplateBinding Padding}" />
+                                CornerRadius="2">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Background="Transparent"
+                                          Focusable="False"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Hidden" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver"
                                      Value="True">
                                 <Setter Property="Background"
-                                        Value="#FF1F8AD6" />
+                                        Value="#f0f8ff" />
                             </Trigger>
-                            <Trigger Property="IsPressed"
+                            <Trigger Property="IsFocused"
                                      Value="True">
                                 <Setter Property="Background"
-                                        Value="#FF005A9E" />
+                                        Value="#f0f8ff" />
+                                <Setter Property="BorderBrush"
+                                        Value="{StaticResource SEC_LightBlue}" />
+                                <Setter Property="BorderThickness"
+                                        Value="1" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -120,70 +280,7 @@
             </Setter>
         </Style>
 
-        <Style x:Key="RefreshButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource CloseButtonStyle}">
-            <Setter Property="Background"
-                    Value="#FF28A745" />
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver"
-                         Value="True">
-                    <Setter Property="Background"
-                            Value="#FF34CE57" />
-                </Trigger>
-                <Trigger Property="IsPressed"
-                         Value="True">
-                    <Setter Property="Background"
-                            Value="#FF1E7E34" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="AutoRefreshButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource CloseButtonStyle}">
-            <Setter Property="Background"
-                    Value="#FF6C757D" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding AutoRefreshEnabled}"
-                             Value="True">
-                    <Setter Property="Background"
-                            Value="#FF17A2B8" />
-                </DataTrigger>
-                <Trigger Property="IsMouseOver"
-                         Value="True">
-                    <Setter Property="Background"
-                            Value="#FF5A6268" />
-                </Trigger>
-                <MultiDataTrigger>
-                    <MultiDataTrigger.Conditions>
-                        <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=IsMouseOver}"
-                                   Value="True" />
-                        <Condition Binding="{Binding AutoRefreshEnabled}"
-                                   Value="True" />
-                    </MultiDataTrigger.Conditions>
-                    <Setter Property="Background"
-                            Value="#FF138496" />
-                </MultiDataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="SectionBorderStyle"
-               TargetType="Border">
-            <Setter Property="Background"
-                    Value="#FF383838" />
-            <Setter Property="CornerRadius"
-                    Value="6" />
-            <Setter Property="Padding"
-                    Value="15" />
-            <Setter Property="Margin"
-                    Value="0,0,0,15" />
-            <Setter Property="BorderThickness"
-                    Value="1" />
-            <Setter Property="BorderBrush"
-                    Value="#FF505050" />
-        </Style>
-
+        <!-- Loading and Error Styles -->
         <Style x:Key="LoadingStyle"
                TargetType="TextBlock"
                BasedOn="{StaticResource ModernTextBlockStyle}">
@@ -194,7 +291,7 @@
             <Setter Property="HorizontalAlignment"
                     Value="Center" />
             <Setter Property="Foreground"
-                    Value="#FF4A9EFF" />
+                    Value="{StaticResource SEC_MidBlue}" />
         </Style>
 
         <Style x:Key="ErrorStyle"
@@ -203,7 +300,7 @@
             <Setter Property="FontSize"
                     Value="12" />
             <Setter Property="Foreground"
-                    Value="#FFFF6B6B" />
+                    Value="#dc2626" />
             <Setter Property="TextWrapping"
                     Value="Wrap" />
             <Setter Property="Margin"
@@ -211,8 +308,9 @@
         </Style>
     </Window.Resources>
 
-    <Grid Margin="20">
+    <Grid Background="#f8fafc">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -220,33 +318,149 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0"
-                    Orientation="Horizontal">
-            <TextBlock Text="{Binding IpAddress, StringFormat='Camera Information - {0}'}"
-                       Style="{StaticResource HeaderTextBlockStyle}"
-                       VerticalAlignment="Center" />
-            <TextBlock Text="(Auto-refresh: ON)"
-                       Style="{StaticResource ModernTextBlockStyle}"
-                       FontSize="12"
-                       Foreground="#FF17A2B8"
-                       Margin="10,0,0,0"
-                       VerticalAlignment="Center"
-                       Visibility="{Binding AutoRefreshEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
-        </StackPanel>
+        <Border Grid.Row="0"
+                Background="{StaticResource SEC_White}"
+                BorderBrush="{StaticResource SEC_LightGrey}"
+                BorderThickness="0,0,0,1">
+            <Grid Margin="24,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="{Binding IpAddress, StringFormat='Camera Information - {0}'}"
+                               Style="{StaticResource HeaderTextBlockStyle}" />
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Real-time device monitoring and configuration details"
+                                   Style="{StaticResource SubHeaderTextBlockStyle}" />
+                        <Border Background="#dbeafe"
+                                Padding="6,2"
+                                CornerRadius="3"
+                                Margin="8,0,0,0">
+                            <TextBlock Text="Auto-refresh: ON (30s)"
+                                       FontSize="11"
+                                       Foreground="#1e40af"
+                                       FontWeight="Bold" />
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal">
+                    <Button Content="📋 Copy All"
+                            Command="{Binding CopyAllCommand}"
+                            Style="{StaticResource SuccessButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Status Panel -->
+        <Border Grid.Row="1"
+                Style="{StaticResource ModernCardStyle}"
+                Margin="24,16,24,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- IP Address -->
+                <Border Grid.Column="0"
+                        Style="{StaticResource StatsCardStyle}">
+                    <StackPanel>
+                        <TextBlock Text="IP ADDRESS"
+                                   FontSize="11"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource SEC_MidGrey}" />
+                        <TextBox Text="{Binding IpAddress, Mode=OneWay}"
+                                 FontSize="16"
+                                 FontWeight="Bold"
+                                 FontFamily="Consolas"
+                                 Foreground="{StaticResource SEC_DarkGrey}"
+                                 Style="{StaticResource SelectableValueTextStyle}" />
+                        <TextBlock Text="Device endpoint"
+                                   FontSize="12"
+                                   Foreground="{StaticResource SEC_MidGrey}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Protocol -->
+                <Border Grid.Column="1"
+                        Style="{StaticResource StatsCardStyle}">
+                    <StackPanel>
+                        <TextBlock Text="PROTOCOL"
+                                   FontSize="11"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource SEC_MidGrey}" />
+                        <TextBox Text="{Binding Protocol, Mode=OneWay}"
+                                 FontSize="16"
+                                 FontWeight="Bold"
+                                 Foreground="#2563eb"
+                                 Style="{StaticResource SelectableValueTextStyle}" />
+                        <TextBox Text="{Binding Port, StringFormat='Port: {0}', Mode=OneWay}"
+                                 FontSize="12"
+                                 Foreground="{StaticResource SEC_MidGrey}"
+                                 Style="{StaticResource SelectableValueTextStyle}"
+                                 Margin="0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Status -->
+                <Border Grid.Column="2"
+                        Style="{StaticResource StatsCardStyle}">
+                    <StackPanel>
+                        <TextBlock Text="STATUS"
+                                   FontSize="11"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource SEC_MidGrey}" />
+                        <TextBox Text="{Binding Status, Mode=OneWay}"
+                                 FontSize="16"
+                                 FontWeight="Bold"
+                                 Foreground="#16a34a"
+                                 Style="{StaticResource SelectableValueTextStyle}" />
+                        <TextBlock Text="Connection state"
+                                   FontSize="12"
+                                   Foreground="{StaticResource SEC_MidGrey}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- User -->
+                <Border Grid.Column="3"
+                        Style="{StaticResource StatsCardStyle}">
+                    <StackPanel>
+                        <TextBlock Text="USERNAME"
+                                   FontSize="11"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource SEC_MidGrey}" />
+                        <TextBox Text="{Binding Username, Mode=OneWay}"
+                                 FontSize="16"
+                                 FontWeight="Bold"
+                                 Foreground="#7c3aed"
+                                 Style="{StaticResource SelectableValueTextStyle}" />
+                        <TextBlock Text="Authentication user"
+                                   FontSize="12"
+                                   Foreground="{StaticResource SEC_MidGrey}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
 
         <!-- Loading Status -->
-        <Border Grid.Row="1"
-                Background="#FF383838"
-                CornerRadius="4"
-                Padding="10"
-                Margin="0,0,0,15"
+        <Border Grid.Row="2"
+                Style="{StaticResource ModernCardStyle}"
+                Margin="24,8,24,8"
+                Background="#dbeafe"
+                BorderBrush="#3b82f6"
                 Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Center">
-                <TextBlock Text="●"
-                           Foreground="#FF4A9EFF"
+                <TextBlock Text="🔄"
                            FontSize="16"
-                           Margin="0,0,10,0">
+                           Margin="0,0,10,0"
+                           Foreground="#1e40af">
                     <TextBlock.RenderTransform>
                         <RotateTransform x:Name="LoadingRotation" />
                     </TextBlock.RenderTransform>
@@ -265,97 +479,45 @@
                     </TextBlock.Triggers>
                 </TextBlock>
                 <TextBlock Text="{Binding LoadingStatus}"
-                           Style="{StaticResource LoadingStyle}" />
+                           Style="{StaticResource LoadingStyle}"
+                           Foreground="#1e40af" />
             </StackPanel>
         </Border>
 
         <!-- Error Message -->
-        <Border Grid.Row="1"
-                Background="#FF8B0000"
-                CornerRadius="4"
-                Padding="10"
-                Margin="0,0,0,15"
+        <Border Grid.Row="2"
+                Style="{StaticResource ModernCardStyle}"
+                Margin="24,8,24,8"
+                Background="#fee2e2"
+                BorderBrush="#ef4444"
                 Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <TextBlock Text="{Binding ErrorMessage}"
-                       Style="{StaticResource ErrorStyle}"
-                       Foreground="White" />
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center">
+                <TextBlock Text="⚠️"
+                           FontSize="16"
+                           Margin="0,0,10,0" />
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Style="{StaticResource ErrorStyle}" />
+            </StackPanel>
         </Border>
 
-        <!-- Content -->
-        <ScrollViewer Grid.Row="2"
-                      VerticalScrollBarVisibility="Auto">
-            <StackPanel>
-                <!-- Connection Information -->
-                <Border Style="{StaticResource SectionBorderStyle}">
-                    <StackPanel>
-                        <TextBlock Text="Connection Information"
-                                   Style="{StaticResource SectionHeaderStyle}" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
+        <!-- Main Content -->
+        <Grid Grid.Row="3"
+              Margin="24,8,24,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-                            <TextBlock Grid.Row="0"
-                                       Grid.Column="0"
-                                       Text="IP Address:"
-                                       Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="0"
-                                       Grid.Column="1"
-                                       Text="{Binding IpAddress}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
-
-                            <TextBlock Grid.Row="1"
-                                       Grid.Column="0"
-                                       Text="Port:"
-                                       Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="1"
-                                       Grid.Column="1"
-                                       Text="{Binding Port}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
-
-                            <TextBlock Grid.Row="2"
-                                       Grid.Column="0"
-                                       Text="Protocol:"
-                                       Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="2"
-                                       Grid.Column="1"
-                                       Text="{Binding Protocol}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
-
-                            <TextBlock Grid.Row="3"
-                                       Grid.Column="0"
-                                       Text="Username:"
-                                       Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="3"
-                                       Grid.Column="1"
-                                       Text="{Binding Username}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
-
-                            <TextBlock Grid.Row="4"
-                                       Grid.Column="0"
-                                       Text="Status:"
-                                       Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="4"
-                                       Grid.Column="1"
-                                       Text="{Binding Status}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
+            <!-- Left Panel -->
+            <StackPanel Grid.Column="0">
                 <!-- Device Information -->
-                <Border Style="{StaticResource SectionBorderStyle}">
+                <Border Style="{StaticResource ModernCardStyle}"
+                        Margin="0,0,0,16">
                     <StackPanel>
-                        <TextBlock Text="Device Information"
-                                   Style="{StaticResource SectionHeaderStyle}" />
+                        <TextBlock Text="📷 Device Information"
+                                   Style="{StaticResource SectionTitleStyle}" />
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120" />
@@ -373,55 +535,56 @@
                                        Grid.Column="0"
                                        Text="Manufacturer:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="0"
-                                       Grid.Column="1"
-                                       Text="{Binding Manufacturer}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="0"
+                                     Grid.Column="1"
+                                     Text="{Binding Manufacturer, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="1"
                                        Grid.Column="0"
                                        Text="Model:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="1"
-                                       Grid.Column="1"
-                                       Text="{Binding Model}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="1"
+                                     Grid.Column="1"
+                                     Text="{Binding Model, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="2"
                                        Grid.Column="0"
                                        Text="Firmware:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="2"
-                                       Grid.Column="1"
-                                       Text="{Binding Firmware}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="2"
+                                     Grid.Column="1"
+                                     Text="{Binding Firmware, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="3"
                                        Grid.Column="0"
                                        Text="Serial Number:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="3"
-                                       Grid.Column="1"
-                                       Text="{Binding SerialNumber}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="3"
+                                     Grid.Column="1"
+                                     Text="{Binding SerialNumber, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="4"
                                        Grid.Column="0"
                                        Text="MAC Address:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="4"
-                                       Grid.Column="1"
-                                       Text="{Binding MacAddress}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="4"
+                                     Grid.Column="1"
+                                     Text="{Binding MacAddress, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
                         </Grid>
                     </StackPanel>
                 </Border>
 
                 <!-- Network Settings -->
-                <Border Style="{StaticResource SectionBorderStyle}">
+                <Border Style="{StaticResource ModernCardStyle}"
+                        Margin="0">
                     <StackPanel>
-                        <TextBlock Text="Network Settings"
-                                   Style="{StaticResource SectionHeaderStyle}" />
+                        <TextBlock Text="🌐 Network Settings"
+                                   Style="{StaticResource SectionTitleStyle}" />
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120" />
@@ -439,55 +602,126 @@
                                        Grid.Column="0"
                                        Text="Current IP:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="0"
-                                       Grid.Column="1"
-                                       Text="{Binding CurrentIp}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="0"
+                                     Grid.Column="1"
+                                     Text="{Binding CurrentIp, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="1"
                                        Grid.Column="0"
                                        Text="Subnet Mask:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="1"
-                                       Grid.Column="1"
-                                       Text="{Binding SubnetMask}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="1"
+                                     Grid.Column="1"
+                                     Text="{Binding SubnetMask, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="2"
                                        Grid.Column="0"
                                        Text="Gateway:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="2"
-                                       Grid.Column="1"
-                                       Text="{Binding Gateway}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="2"
+                                     Grid.Column="1"
+                                     Text="{Binding Gateway, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="3"
                                        Grid.Column="0"
                                        Text="DNS1:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="3"
-                                       Grid.Column="1"
-                                       Text="{Binding Dns1}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="3"
+                                     Grid.Column="1"
+                                     Text="{Binding Dns1, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="4"
                                        Grid.Column="0"
                                        Text="DNS2:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
+                            <TextBox Grid.Row="4"
+                                     Grid.Column="1"
+                                     Text="{Binding Dns2, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Right Panel -->
+            <StackPanel Grid.Column="2">
+                <!-- Connection Information -->
+                <Border Style="{StaticResource ModernCardStyle}"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="🔗 Connection Information"
+                                   Style="{StaticResource SectionTitleStyle}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Grid.Column="0"
+                                       Text="IP Address:"
+                                       Style="{StaticResource LabelTextBlockStyle}" />
+                            <TextBox Grid.Row="0"
+                                     Grid.Column="1"
+                                     Text="{Binding IpAddress, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
+
+                            <TextBlock Grid.Row="1"
+                                       Grid.Column="0"
+                                       Text="Port:"
+                                       Style="{StaticResource LabelTextBlockStyle}" />
+                            <TextBox Grid.Row="1"
+                                     Grid.Column="1"
+                                     Text="{Binding Port, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
+
+                            <TextBlock Grid.Row="2"
+                                       Grid.Column="0"
+                                       Text="Protocol:"
+                                       Style="{StaticResource LabelTextBlockStyle}" />
+                            <TextBox Grid.Row="2"
+                                     Grid.Column="1"
+                                     Text="{Binding Protocol, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
+
+                            <TextBlock Grid.Row="3"
+                                       Grid.Column="0"
+                                       Text="Username:"
+                                       Style="{StaticResource LabelTextBlockStyle}" />
+                            <TextBox Grid.Row="3"
+                                     Grid.Column="1"
+                                     Text="{Binding Username, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
+
                             <TextBlock Grid.Row="4"
-                                       Grid.Column="1"
-                                       Text="{Binding Dns2}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                                       Grid.Column="0"
+                                       Text="Status:"
+                                       Style="{StaticResource LabelTextBlockStyle}" />
+                            <TextBox Grid.Row="4"
+                                     Grid.Column="1"
+                                     Text="{Binding Status, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
                         </Grid>
                     </StackPanel>
                 </Border>
 
                 <!-- Video Stream Information -->
-                <Border Style="{StaticResource SectionBorderStyle}">
+                <Border Style="{StaticResource ModernCardStyle}"
+                        Margin="0">
                     <StackPanel>
-                        <TextBlock Text="Video Stream Information"
-                                   Style="{StaticResource SectionHeaderStyle}" />
+                        <TextBlock Text="🎥 Video Stream Information"
+                                   Style="{StaticResource SectionTitleStyle}" />
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120" />
@@ -505,109 +739,135 @@
                                        Grid.Column="0"
                                        Text="Main Stream:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="0"
-                                       Grid.Column="1"
-                                       Text="{Binding MainStream}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="0"
+                                     Grid.Column="1"
+                                     Text="{Binding MainStream, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="1"
                                        Grid.Column="0"
                                        Text="Sub Stream:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="1"
-                                       Grid.Column="1"
-                                       Text="{Binding SubStream}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="1"
+                                     Grid.Column="1"
+                                     Text="{Binding SubStream, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="2"
                                        Grid.Column="0"
                                        Text="Resolution:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="2"
-                                       Grid.Column="1"
-                                       Text="{Binding Resolution}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="2"
+                                     Grid.Column="1"
+                                     Text="{Binding Resolution, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="3"
                                        Grid.Column="0"
                                        Text="Frame Rate:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="3"
-                                       Grid.Column="1"
-                                       Text="{Binding FrameRate}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="3"
+                                     Grid.Column="1"
+                                     Text="{Binding FrameRate, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
 
                             <TextBlock Grid.Row="4"
                                        Grid.Column="0"
                                        Text="Bit Rate:"
                                        Style="{StaticResource LabelTextBlockStyle}" />
-                            <TextBlock Grid.Row="4"
-                                       Grid.Column="1"
-                                       Text="{Binding BitRate}"
-                                       Style="{StaticResource ValueTextBlockStyle}" />
+                            <TextBox Grid.Row="4"
+                                     Grid.Column="1"
+                                     Text="{Binding BitRate, Mode=OneWay}"
+                                     Style="{StaticResource SelectableValueTextStyle}" />
                         </Grid>
                     </StackPanel>
                 </Border>
             </StackPanel>
-        </ScrollViewer>
+        </Grid>
 
-        <!-- Button Section -->
-        <StackPanel Grid.Row="3"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right">
-            <!-- Auto Refresh Toggle Button -->
-            <Button Width="100"
-                    Height="32"
-                    Margin="0,0,10,0"
-                    Style="{StaticResource AutoRefreshButtonStyle}"
-                    Command="{Binding ToggleAutoRefreshCommand}">
-                <Button.Content>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="🔄"
-                                   FontSize="10"
-                                   Margin="0,0,5,0" />
-                        <TextBlock>
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Text"
-                                            Value="Auto: OFF" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding AutoRefreshEnabled}"
-                                                     Value="True">
-                                            <Setter Property="Text"
-                                                    Value="Auto: ON" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </StackPanel>
-                </Button.Content>
-            </Button>
+        <!-- Action Bar -->
+        <Border Grid.Row="4"
+                Background="{StaticResource SEC_White}"
+                BorderBrush="{StaticResource SEC_LightGrey}"
+                BorderThickness="0,1,0,0">
+            <Grid Margin="24,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <!-- Cancel Button - Only visible when loading -->
-            <Button Content="Cancel"
-                    Width="80"
-                    Height="32"
-                    Margin="0,0,10,0"
-                    Style="{StaticResource RefreshButtonStyle}"
-                    Command="{Binding CancelCommand}"
-                    Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Ellipse Width="12"
+                             Height="12"
+                             Margin="0,0,8,0">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill"
+                                        Value="#6b7280" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsLoading}"
+                                                 Value="True">
+                                        <Setter Property="Fill"
+                                                Value="#3b82f6" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding HasError}"
+                                                 Value="True">
+                                        <Setter Property="Fill"
+                                                Value="#ef4444" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding HasError}"
+                                                 Value="False">
+                                        <Setter Property="Fill"
+                                                Value="#16a34a" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock VerticalAlignment="Center"
+                               Foreground="{StaticResource SEC_DarkGrey}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text"
+                                        Value="Ready - Auto-refreshing every 30 seconds" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsLoading}"
+                                                 Value="True">
+                                        <Setter Property="Text"
+                                                Value="Loading device information..." />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding HasError}"
+                                                 Value="True">
+                                        <Setter Property="Text"
+                                                Value="Error occurred while loading" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
 
-            <!-- Refresh Button - Only visible when NOT loading -->
-            <Button Content="Refresh"
-                    Width="80"
-                    Height="32"
-                    Margin="0,0,10,0"
-                    Style="{StaticResource RefreshButtonStyle}"
-                    Command="{Binding RefreshCommand}"
-                    Visibility="{Binding IsLoading, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal">
+                    <!-- Cancel Button - Only visible when loading -->
+                    <Button Content="⏹️ Cancel"
+                            Command="{Binding CancelCommand}"
+                            Style="{StaticResource DangerButtonStyle}"
+                            Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-            <Button Content="Close"
-                    Width="80"
-                    Height="32"
-                    Style="{StaticResource CloseButtonStyle}"
-                    Click="CloseButton_Click" />
-        </StackPanel>
+                    <!-- Refresh Button - Only visible when NOT loading -->
+                    <Button Content="🔄 Refresh"
+                            Command="{Binding RefreshCommand}"
+                            Style="{StaticResource SuccessButtonStyle}"
+                            Visibility="{Binding IsLoading, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
+
+                    <Button Content="❌ Close"
+                            Click="CloseButton_Click"
+                            Style="{StaticResource PrimaryButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

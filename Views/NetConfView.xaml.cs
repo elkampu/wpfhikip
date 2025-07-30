@@ -2,6 +2,8 @@
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Text.RegularExpressions;
+using System.Net;
 
 using wpfhikip.Models;
 using wpfhikip.Views.Dialogs;
@@ -51,6 +53,7 @@ namespace wpfhikip.Views
                 }
             }
         }
+
         // Add this method to the NetConfView class
         private void CameraInfoButton_Click(object sender, RoutedEventArgs e)
         {
@@ -89,16 +92,8 @@ namespace wpfhikip.Views
             // COPY
             if (e.Key == Key.C && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
-                var cellInfo = dataGrid.CurrentCell;
-                if (cellInfo.Column != null)
-                {
-                    var content = cellInfo.Column.GetCellContent(cellInfo.Item);
-                    if (content is TextBlock textBlock)
-                    {
-                        Clipboard.SetText(textBlock.Text);
-                        e.Handled = true;
-                    }
-                }
+                CopySelectedCell();
+                e.Handled = true;
             }
             // PASTE
             if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
@@ -108,6 +103,74 @@ namespace wpfhikip.Views
             }
         }
 
+        private void CopySelectedCell()
+        {
+            var cellInfo = dataGrid.CurrentCell;
+            if (cellInfo.Column == null || cellInfo.Item == null)
+                return;
+
+            string textToCopy = string.Empty;
+
+            // Check if this is an IP address column
+            if (cellInfo.Column is DataGridTemplateColumn templateColumn)
+            {
+                var columnHeader = templateColumn.Header?.ToString();
+                if (IsIpAddressColumn(columnHeader))
+                {
+                    // Get the IP address value from the data model
+                    var camera = (Camera)cellInfo.Item;
+                    textToCopy = GetIpAddressFromColumn(columnHeader, camera);
+                }
+            }
+
+            // If not an IP column or no IP value found, try to get text from the cell content
+            if (string.IsNullOrEmpty(textToCopy))
+            {
+                var content = cellInfo.Column.GetCellContent(cellInfo.Item);
+                if (content is TextBlock textBlock)
+                {
+                    textToCopy = textBlock.Text;
+                }
+                else if (content is ContentPresenter presenter)
+                {
+                    // Try to find TextBlock within ContentPresenter
+                    var textBlockInPresenter = FindVisualChild<TextBlock>(presenter);
+                    if (textBlockInPresenter != null)
+                    {
+                        textToCopy = textBlockInPresenter.Text;
+                    }
+                    else
+                    {
+                        // Try to find IpAddressControl within ContentPresenter
+                        var ipControl = FindVisualChild<IpAddressControl>(presenter);
+                        if (ipControl != null)
+                        {
+                            textToCopy = ipControl.IpAddress;
+                        }
+                    }
+                }
+            }
+
+            // Copy to clipboard if we have text
+            if (!string.IsNullOrEmpty(textToCopy))
+            {
+                Clipboard.SetText(textToCopy);
+            }
+        }
+
+        private string GetIpAddressFromColumn(string columnHeader, Camera camera)
+        {
+            return columnHeader switch
+            {
+                "Current IP" => camera.CurrentIP,
+                "New IP" => camera.NewIP,
+                "Mask" => camera.NewMask,
+                "Gateway" => camera.NewGateway,
+                "NTP" => camera.NewNTPServer,
+                _ => string.Empty
+            };
+        }
+
         private void PasteToSelectedCell()
         {
             if (dataGrid.CurrentCell.Item != null && Clipboard.ContainsText())
@@ -115,12 +178,144 @@ namespace wpfhikip.Views
                 var clipboardText = Clipboard.GetText();
                 var column = dataGrid.CurrentCell.Column;
                 var row = (Camera)dataGrid.CurrentItem;
+
+                // Check if this is an IP address column
+                if (column is DataGridTemplateColumn templateColumn)
+                {
+                    var columnHeader = templateColumn.Header?.ToString();
+                    if (IsIpAddressColumn(columnHeader))
+                    {
+                        PasteIpAddress(clipboardText, columnHeader, row);
+                        return;
+                    }
+                }
+
+                // Handle regular text columns
                 var property = typeof(Camera).GetProperty(column.SortMemberPath);
                 if (property != null && property.CanWrite)
                 {
                     property.SetValue(row, clipboardText);
                 }
             }
+        }
+
+        private bool IsIpAddressColumn(string columnHeader)
+        {
+            return columnHeader == "Current IP" || columnHeader == "New IP" ||
+                   columnHeader == "Mask" || columnHeader == "Gateway" || columnHeader == "NTP";
+        }
+
+        private void PasteIpAddress(string clipboardText, string columnHeader, Camera camera)
+        {
+            // Extract IP address from clipboard text
+            var extractedIp = ExtractIpAddressFromText(clipboardText);
+
+            if (string.IsNullOrEmpty(extractedIp))
+            {
+                ShowIpValidationError("Invalid IP address format in clipboard. Supported formats:\n" +
+                                    "• xxx.xxx.xxx.xxx\n" +
+                                    "• http://xxx.xxx.xxx.xxx/\n" +
+                                    "• https://xxx.xxx.xxx.xxx/");
+                return;
+            }
+
+            // Validate the extracted IP address
+            if (!IsValidIpAddress(extractedIp))
+            {
+                ShowIpValidationError("The clipboard contains an invalid IP address.\nPlease ensure the IP address is in correct format (0-255 for each octet).");
+                return;
+            }
+
+            // Set the IP address to the appropriate property
+            switch (columnHeader)
+            {
+                case "Current IP":
+                    camera.CurrentIP = extractedIp;
+                    break;
+                case "New IP":
+                    camera.NewIP = extractedIp;
+                    break;
+                case "Mask":
+                    camera.NewMask = extractedIp;
+                    break;
+                case "Gateway":
+                    camera.NewGateway = extractedIp;
+                    break;
+                case "NTP":
+                    camera.NewNTPServer = extractedIp;
+                    break;
+            }
+
+            // If the cell is currently being edited, update the IpAddressControl as well
+            var cellContent = dataGrid.CurrentCell.Column.GetCellContent(dataGrid.CurrentCell.Item);
+            if (cellContent != null)
+            {
+                var ipControl = FindVisualChild<IpAddressControl>(cellContent);
+                if (ipControl != null)
+                {
+                    ipControl.IpAddress = extractedIp;
+                }
+            }
+        }
+
+        private string ExtractIpAddressFromText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+
+            text = text.Trim();
+
+            // Pattern 1: Direct IP address (86.49.161.121)
+            var directIpPattern = @"^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$";
+            var directMatch = Regex.Match(text, directIpPattern);
+            if (directMatch.Success)
+            {
+                return directMatch.Groups[1].Value;
+            }
+
+            // Pattern 2: HTTP URL (http://86.49.161.121/ or https://86.49.161.121/)
+            var urlPattern = @"^https?://(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/?.*$";
+            var urlMatch = Regex.Match(text, urlPattern, RegexOptions.IgnoreCase);
+            if (urlMatch.Success)
+            {
+                return urlMatch.Groups[1].Value;
+            }
+
+            // Pattern 3: Try to extract any IP-like pattern from the text
+            var anyIpPattern = @"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})";
+            var anyMatch = Regex.Match(text, anyIpPattern);
+            if (anyMatch.Success)
+            {
+                return anyMatch.Groups[1].Value;
+            }
+
+            return string.Empty;
+        }
+
+        private bool IsValidIpAddress(string ipAddress)
+        {
+            if (string.IsNullOrWhiteSpace(ipAddress))
+                return false;
+
+            // Use IPAddress.TryParse for comprehensive validation
+            if (IPAddress.TryParse(ipAddress, out var ip))
+            {
+                // Ensure it's IPv4 and not loopback/multicast/broadcast for practical use
+                var bytes = ip.GetAddressBytes();
+                if (bytes.Length == 4)
+                {
+                    // Additional validation for each octet to be between 0-255
+                    // IPAddress.TryParse already handles this, but let's be explicit
+                    return bytes.All(b => b >= 0 && b <= 255);
+                }
+            }
+
+            return false;
+        }
+
+        private void ShowIpValidationError(string message)
+        {
+            MessageBox.Show(this, message, "Invalid IP Address", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         // New event handler for status button clicks

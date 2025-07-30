@@ -82,29 +82,6 @@ namespace wpfhikip.Discovery.Protocols.Arp
         {
             var arpEntries = new List<ArpEntry>();
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                arpEntries = await GetWindowsArpTableAsync();
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                arpEntries = await GetLinuxArpTableAsync();
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                arpEntries = await GetMacArpTableAsync();
-            }
-
-            return arpEntries;
-        }
-
-        /// <summary>
-        /// Gets ARP table on Windows using arp command
-        /// </summary>
-        private async Task<List<ArpEntry>> GetWindowsArpTableAsync()
-        {
-            var arpEntries = new List<ArpEntry>();
-
             try
             {
                 var processInfo = new ProcessStartInfo
@@ -122,7 +99,7 @@ namespace wpfhikip.Discovery.Protocols.Arp
                     var output = await process.StandardOutput.ReadToEndAsync();
                     await process.WaitForExitAsync();
 
-                    arpEntries = ParseWindowsArpOutput(output);
+                    arpEntries = ParseArpOutput(output);
                 }
             }
             catch
@@ -133,90 +110,11 @@ namespace wpfhikip.Discovery.Protocols.Arp
             return arpEntries;
         }
 
-        /// <summary>
-        /// Gets ARP table on Linux
-        /// </summary>
-        private async Task<List<ArpEntry>> GetLinuxArpTableAsync()
-        {
-            var arpEntries = new List<ArpEntry>();
-
-            try
-            {
-                // Try reading /proc/net/arp first
-                if (System.IO.File.Exists("/proc/net/arp"))
-                {
-                    var arpContent = await System.IO.File.ReadAllTextAsync("/proc/net/arp");
-                    arpEntries = ParseLinuxArpOutput(arpContent);
-                }
-                else
-                {
-                    // Fall back to arp command
-                    var processInfo = new ProcessStartInfo
-                    {
-                        FileName = "arp",
-                        Arguments = "-a",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true
-                    };
-
-                    using var process = Process.Start(processInfo);
-                    if (process != null)
-                    {
-                        var output = await process.StandardOutput.ReadToEndAsync();
-                        await process.WaitForExitAsync();
-
-                        arpEntries = ParseLinuxArpCommandOutput(output);
-                    }
-                }
-            }
-            catch
-            {
-                // ARP table reading failed
-            }
-
-            return arpEntries;
-        }
-
-        /// <summary>
-        /// Gets ARP table on macOS
-        /// </summary>
-        private async Task<List<ArpEntry>> GetMacArpTableAsync()
-        {
-            var arpEntries = new List<ArpEntry>();
-
-            try
-            {
-                var processInfo = new ProcessStartInfo
-                {
-                    FileName = "arp",
-                    Arguments = "-a",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true
-                };
-
-                using var process = Process.Start(processInfo);
-                if (process != null)
-                {
-                    var output = await process.StandardOutput.ReadToEndAsync();
-                    await process.WaitForExitAsync();
-
-                    arpEntries = ParseMacArpOutput(output);
-                }
-            }
-            catch
-            {
-                // ARP table reading failed
-            }
-
-            return arpEntries;
-        }
 
         /// <summary>
         /// Parses Windows arp -a output
         /// </summary>
-        private List<ArpEntry> ParseWindowsArpOutput(string output)
+        private List<ArpEntry> ParseArpOutput(string output)
         {
             var entries = new List<ArpEntry>();
             var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -248,109 +146,6 @@ namespace wpfhikip.Discovery.Protocols.Arp
             return entries;
         }
 
-        /// <summary>
-        /// Parses Linux /proc/net/arp output
-        /// </summary>
-        private List<ArpEntry> ParseLinuxArpOutput(string output)
-        {
-            var entries = new List<ArpEntry>();
-            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-
-            // Skip header line
-            for (int i = 1; i < lines.Length; i++)
-            {
-                var fields = lines[i].Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                if (fields.Length >= 6)
-                {
-                    if (IPAddress.TryParse(fields[0], out var ipAddress))
-                    {
-                        var macAddress = fields[3];
-                        if (!string.IsNullOrEmpty(macAddress) && macAddress != "00:00:00:00:00:00")
-                        {
-                            entries.Add(new ArpEntry
-                            {
-                                IPAddress = ipAddress,
-                                MACAddress = macAddress.ToUpper(),
-                                Type = "dynamic",
-                                Interface = fields[5]
-                            });
-                        }
-                    }
-                }
-            }
-
-            return entries;
-        }
-
-        /// <summary>
-        /// Parses Linux arp command output
-        /// </summary>
-        private List<ArpEntry> ParseLinuxArpCommandOutput(string output)
-        {
-            var entries = new List<ArpEntry>();
-            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-
-            // Format: hostname (ip) at mac [ether] on interface
-            var arpRegex = new Regex(@"(\S+)\s+\((\d+\.\d+\.\d+\.\d+)\)\s+at\s+([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})", RegexOptions.IgnoreCase);
-
-            foreach (var line in lines)
-            {
-                var match = arpRegex.Match(line);
-                if (match.Success)
-                {
-                    if (IPAddress.TryParse(match.Groups[2].Value, out var ipAddress))
-                    {
-                        var hostname = match.Groups[1].Value;
-                        var macAddress = match.Groups[3].Value.ToUpper();
-
-                        entries.Add(new ArpEntry
-                        {
-                            IPAddress = ipAddress,
-                            MACAddress = macAddress,
-                            Hostname = hostname != ipAddress.ToString() ? hostname : null,
-                            Type = "dynamic"
-                        });
-                    }
-                }
-            }
-
-            return entries;
-        }
-
-        /// <summary>
-        /// Parses macOS arp -a output
-        /// </summary>
-        private List<ArpEntry> ParseMacArpOutput(string output)
-        {
-            var entries = new List<ArpEntry>();
-            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-
-            // Format: hostname (ip) at mac on interface ifscope [ethernet]
-            var arpRegex = new Regex(@"(\S+)\s+\((\d+\.\d+\.\d+\.\d+)\)\s+at\s+([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})", RegexOptions.IgnoreCase);
-
-            foreach (var line in lines)
-            {
-                var match = arpRegex.Match(line);
-                if (match.Success)
-                {
-                    if (IPAddress.TryParse(match.Groups[2].Value, out var ipAddress))
-                    {
-                        var hostname = match.Groups[1].Value;
-                        var macAddress = match.Groups[3].Value.ToUpper();
-
-                        entries.Add(new ArpEntry
-                        {
-                            IPAddress = ipAddress,
-                            MACAddress = macAddress,
-                            Hostname = hostname != ipAddress.ToString() ? hostname : null,
-                            Type = "dynamic"
-                        });
-                    }
-                }
-            }
-
-            return entries;
-        }
 
         /// <summary>
         /// Creates a DiscoveredDevice from an ARP entry

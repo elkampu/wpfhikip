@@ -8,8 +8,7 @@
         Title="Network Discovery Tool"
         Height="900"
         Width="1400"
-        WindowStartupLocation="CenterScreen"
-        WindowState="Maximized">
+        WindowStartupLocation="CenterScreen">
 
     <Window.Resources>
         <!-- Converters -->

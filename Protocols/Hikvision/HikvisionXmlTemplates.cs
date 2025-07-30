@@ -23,7 +23,7 @@ namespace wpfhikip.Protocols.Hikvision
         }
 
         /// <summary>
-        /// Extracts values from response XML into a flat dictionary
+        /// Extracts values from response XML into a flat dictionary with proper handling of nested structures
         /// </summary>
         public static Dictionary<string, string> ParseResponseXml(string xmlResponse)
         {
@@ -31,19 +31,198 @@ namespace wpfhikip.Protocols.Hikvision
             try
             {
                 var doc = XDocument.Parse(xmlResponse);
-                foreach (var element in doc.Descendants())
+                var root = doc.Root;
+
+                if (root == null) return result;
+
+                // Handle network IP address XML structure
+                if (root.Name.LocalName == "IPAddress")
                 {
-                    if (!element.HasElements && !string.IsNullOrWhiteSpace(element.Value))
+                    ParseNetworkIpAddressXml(root, result);
+                }
+                // Handle device info XML structure
+                else if (root.Name.LocalName == "DeviceInfo")
+                {
+                    ParseDeviceInfoXml(root, result);
+                }
+                // Handle capabilities XML structure
+                else if (root.Name.LocalName == "DeviceCap")
+                {
+                    ParseCapabilitiesXml(root, result);
+                }
+                // Fallback: generic parsing for other XML structures
+                else
+                {
+                    ParseGenericXml(root, result);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Add error to result for debugging
+                result["ParseError"] = $"XML parsing failed: {ex.Message}";
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Parses network IP address configuration XML from Hikvision camera
+        /// </summary>
+        private static void ParseNetworkIpAddressXml(XElement root, Dictionary<string, string> result)
+        {
+            // Get the namespace from the root element
+            var ns = root.GetDefaultNamespace();
+
+            // Basic network settings - use LocalName to ignore namespace
+            var ipVersion = root.Element(ns + "ipVersion")?.Value ?? root.Elements().FirstOrDefault(e => e.Name.LocalName == "ipVersion")?.Value;
+            if (!string.IsNullOrEmpty(ipVersion))
+                result["ipVersion"] = ipVersion;
+
+            var addressingType = root.Element(ns + "addressingType")?.Value ?? root.Elements().FirstOrDefault(e => e.Name.LocalName == "addressingType")?.Value;
+            if (!string.IsNullOrEmpty(addressingType))
+                result["addressingType"] = addressingType;
+
+            var ipAddress = root.Element(ns + "ipAddress")?.Value ?? root.Elements().FirstOrDefault(e => e.Name.LocalName == "ipAddress")?.Value;
+            if (!string.IsNullOrEmpty(ipAddress))
+                result["ipAddress"] = ipAddress;
+
+            var subnetMask = root.Element(ns + "subnetMask")?.Value ?? root.Elements().FirstOrDefault(e => e.Name.LocalName == "subnetMask")?.Value;
+            if (!string.IsNullOrEmpty(subnetMask))
+                result["subnetMask"] = subnetMask;
+
+            var ipv6Address = root.Element(ns + "ipv6Address")?.Value ?? root.Elements().FirstOrDefault(e => e.Name.LocalName == "ipv6Address")?.Value;
+            if (!string.IsNullOrEmpty(ipv6Address))
+                result["ipv6Address"] = ipv6Address;
+
+            var bitMask = root.Element(ns + "bitMask")?.Value ?? root.Elements().FirstOrDefault(e => e.Name.LocalName == "bitMask")?.Value;
+            if (!string.IsNullOrEmpty(bitMask))
+                result["bitMask"] = bitMask;
+
+            // Parse Default Gateway (nested structure) - handle both with and without namespace
+            var defaultGateway = root.Element(ns + "DefaultGateway") ?? root.Elements().FirstOrDefault(e => e.Name.LocalName == "DefaultGateway");
+            if (defaultGateway != null)
+            {
+                var gatewayIp = defaultGateway.Element(ns + "ipAddress")?.Value ?? defaultGateway.Elements().FirstOrDefault(e => e.Name.LocalName == "ipAddress")?.Value;
+                if (!string.IsNullOrEmpty(gatewayIp))
+                    result["defaultGateway"] = gatewayIp;
+
+                var gatewayIpv6 = defaultGateway.Element(ns + "ipv6Address")?.Value ?? defaultGateway.Elements().FirstOrDefault(e => e.Name.LocalName == "ipv6Address")?.Value;
+                if (!string.IsNullOrEmpty(gatewayIpv6))
+                    result["defaultGatewayIpv6"] = gatewayIpv6;
+            }
+
+            // Parse Primary DNS (nested structure) - handle both with and without namespace
+            var primaryDns = root.Element(ns + "PrimaryDNS") ?? root.Elements().FirstOrDefault(e => e.Name.LocalName == "PrimaryDNS");
+            if (primaryDns != null)
+            {
+                var dnsIp = primaryDns.Element(ns + "ipAddress")?.Value ?? primaryDns.Elements().FirstOrDefault(e => e.Name.LocalName == "ipAddress")?.Value;
+                if (!string.IsNullOrEmpty(dnsIp))
+                    result["primaryDNS"] = dnsIp;
+            }
+
+            // Parse Secondary DNS (nested structure) - handle both with and without namespace
+            var secondaryDns = root.Element(ns + "SecondaryDNS") ?? root.Elements().FirstOrDefault(e => e.Name.LocalName == "SecondaryDNS");
+            if (secondaryDns != null)
+            {
+                var dnsIp = secondaryDns.Element(ns + "ipAddress")?.Value ?? secondaryDns.Elements().FirstOrDefault(e => e.Name.LocalName == "ipAddress")?.Value;
+                if (!string.IsNullOrEmpty(dnsIp))
+                    result["secondaryDNS"] = dnsIp;
+            }
+
+            // Parse IPv6 Mode information - handle both with and without namespace
+            var ipv6Mode = root.Element(ns + "Ipv6Mode") ?? root.Elements().FirstOrDefault(e => e.Name.LocalName == "Ipv6Mode");
+            if (ipv6Mode != null)
+            {
+                var ipv6AddressingType = ipv6Mode.Element(ns + "ipV6AddressingType")?.Value ?? ipv6Mode.Elements().FirstOrDefault(e => e.Name.LocalName == "ipV6AddressingType")?.Value;
+                if (!string.IsNullOrEmpty(ipv6AddressingType))
+                    result["ipv6AddressingType"] = ipv6AddressingType;
+
+                // Parse IPv6 address list
+                var ipv6AddressList = ipv6Mode.Element(ns + "ipv6AddressList") ?? ipv6Mode.Elements().FirstOrDefault(e => e.Name.LocalName == "ipv6AddressList");
+                if (ipv6AddressList != null)
+                {
+                    var v6Addresses = ipv6AddressList.Elements().Where(e => e.Name.LocalName == "v6Address").ToList();
+                    for (int i = 0; i < v6Addresses.Count; i++)
                     {
-                        result[element.Name.LocalName] = element.Value;
+                        var v6Address = v6Addresses[i];
+                        var id = v6Address.Elements().FirstOrDefault(e => e.Name.LocalName == "id")?.Value;
+                        var type = v6Address.Elements().FirstOrDefault(e => e.Name.LocalName == "type")?.Value;
+                        var address = v6Address.Elements().FirstOrDefault(e => e.Name.LocalName == "address")?.Value;
+                        var mask = v6Address.Elements().FirstOrDefault(e => e.Name.LocalName == "bitMask")?.Value;
+
+                        if (!string.IsNullOrEmpty(id))
+                            result[$"ipv6Address_{i}_id"] = id;
+                        if (!string.IsNullOrEmpty(type))
+                            result[$"ipv6Address_{i}_type"] = type;
+                        if (!string.IsNullOrEmpty(address))
+                            result[$"ipv6Address_{i}_address"] = address;
+                        if (!string.IsNullOrEmpty(mask))
+                            result[$"ipv6Address_{i}_bitMask"] = mask;
                     }
                 }
             }
-            catch (Exception)
+        }
+
+        /// <summary>
+        /// Parses device information XML from Hikvision camera
+        /// </summary>
+        private static void ParseDeviceInfoXml(XElement root, Dictionary<string, string> result)
+        {
+            // Parse all child elements for device info
+            foreach (var element in root.Elements())
             {
-                // Log error or handle as needed
+                if (!element.HasElements && !string.IsNullOrWhiteSpace(element.Value))
+                {
+                    result[element.Name.LocalName] = element.Value;
+                }
             }
-            return result;
+        }
+
+        /// <summary>
+        /// Parses capabilities XML from Hikvision camera
+        /// </summary>
+        private static void ParseCapabilitiesXml(XElement root, Dictionary<string, string> result)
+        {
+            // Parse all descendant elements for capabilities
+            foreach (var element in root.Descendants())
+            {
+                if (!element.HasElements && !string.IsNullOrWhiteSpace(element.Value))
+                {
+                    // Use full path for nested elements to avoid conflicts
+                    var elementPath = GetElementPath(element);
+                    result[elementPath] = element.Value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Generic XML parsing for unknown structures (fallback)
+        /// </summary>
+        private static void ParseGenericXml(XElement root, Dictionary<string, string> result)
+        {
+            foreach (var element in root.Descendants())
+            {
+                if (!element.HasElements && !string.IsNullOrWhiteSpace(element.Value))
+                {
+                    result[element.Name.LocalName] = element.Value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the full path of an XML element for unique identification
+        /// </summary>
+        private static string GetElementPath(XElement element)
+        {
+            var path = element.Name.LocalName;
+            var parent = element.Parent;
+
+            while (parent != null && parent.Name.LocalName != "root")
+            {
+                path = parent.Name.LocalName + "." + path;
+                parent = parent.Parent;
+            }
+
+            return path;
         }
 
         /// <summary>
@@ -96,10 +275,15 @@ namespace wpfhikip.Protocols.Hikvision
                 var doc = XDocument.Parse(originalXml);
                 bool modified = false;
 
-                // Handle IP address
+                // Handle IP address (avoid changing gateway IP)
                 if (!string.IsNullOrEmpty(camera.NewIP))
                 {
-                    var ipElements = doc.Descendants().Where(e => e.Name.LocalName == "ipAddress" && e.Parent?.Name.LocalName != "DefaultGateway");
+                    var ipElements = doc.Descendants()
+                        .Where(e => e.Name.LocalName == "ipAddress" &&
+                               e.Parent?.Name.LocalName != "DefaultGateway" &&
+                               e.Parent?.Name.LocalName != "PrimaryDNS" &&
+                               e.Parent?.Name.LocalName != "SecondaryDNS");
+
                     foreach (var ipElement in ipElements)
                     {
                         if (!ipElement.HasElements)
@@ -225,13 +409,10 @@ namespace wpfhikip.Protocols.Hikvision
                 currentValues.GetValueOrDefault("subnetMask") != camera.NewMask)
                 return true;
 
-            // Check if gateway changed - we need to handle this specially since gateway is nested
-            if (!string.IsNullOrEmpty(camera.NewGateway))
-            {
-                // For now, assume gateway changed if it's specified (since parsing nested gateway is complex)
-                // TODO: Parse nested gateway structure from currentValues to do proper comparison
+            // Check if gateway changed
+            if (!string.IsNullOrEmpty(camera.NewGateway) &&
+                currentValues.GetValueOrDefault("defaultGateway") != camera.NewGateway)
                 return true;
-            }
 
             return false;
         }

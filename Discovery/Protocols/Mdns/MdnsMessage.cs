@@ -3,282 +3,333 @@
 namespace wpfhikip.Discovery.Protocols.Mdns
 {
     /// <summary>
-    /// Represents an mDNS message
+    /// Correctly formatted mDNS message handling
     /// </summary>
     public class MdnsMessage
     {
         public ushort TransactionId { get; set; }
-        public bool IsResponse { get; set; }
-        public bool IsAuthoritativeAnswer { get; set; }
-        public bool IsTruncated { get; set; }
-        public bool IsRecursionDesired { get; set; }
-        public bool IsRecursionAvailable { get; set; }
-
+        public ushort Flags { get; set; }
         public List<MdnsRecord> Questions { get; set; } = new();
         public List<MdnsRecord> Answers { get; set; } = new();
         public List<MdnsRecord> Authority { get; set; } = new();
         public List<MdnsRecord> Additional { get; set; } = new();
 
         /// <summary>
-        /// Creates an mDNS query for a service type
+        /// Creates a proper mDNS query for multiple services
         /// </summary>
-        public static MdnsMessage CreateQuery(string serviceType)
+        public static MdnsMessage CreateQuery(params string[] serviceTypes)
         {
             var message = new MdnsMessage
             {
                 TransactionId = 0, // mDNS uses 0 for queries
-                IsResponse = false,
-                IsRecursionDesired = false
+                Flags = 0x0000 // Standard query flags
             };
 
-            message.Questions.Add(new MdnsRecord
+            foreach (var serviceType in serviceTypes)
             {
-                Name = serviceType,
-                Type = MdnsRecordType.PTR,
-                Class = MdnsRecordClass.IN
-            });
+                message.Questions.Add(new MdnsRecord
+                {
+                    Name = serviceType,
+                    Type = MdnsRecordType.PTR,
+                    Class = MdnsRecordClass.IN
+                });
+            }
 
             return message;
         }
 
         /// <summary>
-        /// Parses mDNS message from byte array
+        /// Parses mDNS message from bytes
         /// </summary>
         public static MdnsMessage? Parse(byte[] data)
         {
-            if (data.Length < 12)
-                return null;
+            if (data == null || data.Length < 12) return null;
 
             try
             {
-                var message = new MdnsMessage();
-                int offset = 0;
-
-                // Parse header
-                message.TransactionId = (ushort)((data[offset] << 8) | data[offset + 1]);
-                offset += 2;
-
-                var flags = (ushort)((data[offset] << 8) | data[offset + 1]);
-                offset += 2;
-
-                message.IsResponse = (flags & 0x8000) != 0;
-                message.IsAuthoritativeAnswer = (flags & 0x0400) != 0;
-                message.IsTruncated = (flags & 0x0200) != 0;
-                message.IsRecursionDesired = (flags & 0x0100) != 0;
-                message.IsRecursionAvailable = (flags & 0x0080) != 0;
-
-                var questionCount = (ushort)((data[offset] << 8) | data[offset + 1]);
-                offset += 2;
-                var answerCount = (ushort)((data[offset] << 8) | data[offset + 1]);
-                offset += 2;
-                var authorityCount = (ushort)((data[offset] << 8) | data[offset + 1]);
-                offset += 2;
-                var additionalCount = (ushort)((data[offset] << 8) | data[offset + 1]);
-                offset += 2;
-
-                // Parse sections (simplified parsing)
-                for (int i = 0; i < questionCount && offset < data.Length; i++)
+                var message = new MdnsMessage
                 {
-                    var record = ParseRecord(data, ref offset, true);
-                    if (record != null)
-                        message.Questions.Add(record);
-                }
+                    TransactionId = ReadUInt16(data, 0),
+                    Flags = ReadUInt16(data, 2)
+                };
 
-                for (int i = 0; i < answerCount && offset < data.Length; i++)
-                {
-                    var record = ParseRecord(data, ref offset, false);
-                    if (record != null)
-                        message.Answers.Add(record);
-                }
+                // Read counts from header
+                var questionCount = ReadUInt16(data, 4);
+                var answerCount = ReadUInt16(data, 6);
+                var authorityCount = ReadUInt16(data, 8);
+                var additionalCount = ReadUInt16(data, 10);
+
+                int offset = 12; // Skip header
+
+                // Parse sections
+                ParseRecords(data, ref offset, questionCount, message.Questions, true);
+                ParseRecords(data, ref offset, answerCount, message.Answers, false);
+                ParseRecords(data, ref offset, authorityCount, message.Authority, false);
+                ParseRecords(data, ref offset, additionalCount, message.Additional, false);
 
                 return message;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error parsing mDNS message: {ex.Message}");
                 return null;
             }
         }
 
         /// <summary>
-        /// Converts message to byte array
+        /// Converts to properly formatted byte array (FIXED)
         /// </summary>
         public byte[] ToByteArray()
         {
             var result = new List<byte>();
 
-            // Header
-            result.AddRange(BitConverter.GetBytes((ushort)((TransactionId << 8) | (TransactionId >> 8))));
+            // Header (12 bytes) - Properly formatted for mDNS
+            WriteUInt16(result, TransactionId);                    // Transaction ID (big-endian)
+            WriteUInt16(result, Flags);                           // Flags (big-endian)
+            WriteUInt16(result, (ushort)Questions.Count);         // Question count
+            WriteUInt16(result, (ushort)Answers.Count);           // Answer count
+            WriteUInt16(result, (ushort)Authority.Count);         // Authority count
+            WriteUInt16(result, (ushort)Additional.Count);        // Additional count
 
-            ushort flags = 0;
-            if (IsRecursionDesired) flags |= 0x0001;
-            result.AddRange(BitConverter.GetBytes((ushort)((flags << 8) | (flags >> 8))));
-
-            result.AddRange(BitConverter.GetBytes((ushort)(((ushort)Questions.Count << 8) | ((ushort)Questions.Count >> 8))));
-            result.AddRange(BitConverter.GetBytes((ushort)0)); // Answer count
-            result.AddRange(BitConverter.GetBytes((ushort)0)); // Authority count
-            result.AddRange(BitConverter.GetBytes((ushort)0)); // Additional count
-
-            // Questions
+            // Questions section
             foreach (var question in Questions)
             {
-                result.AddRange(EncodeNameAsLabels(question.Name));
-                result.AddRange(BitConverter.GetBytes((ushort)(((ushort)question.Type << 8) | ((ushort)question.Type >> 8))));
-                result.AddRange(BitConverter.GetBytes((ushort)(((ushort)question.Class << 8) | ((ushort)question.Class >> 8))));
+                result.AddRange(EncodeName(question.Name));
+                WriteUInt16(result, (ushort)question.Type);        // Type (big-endian)
+                WriteUInt16(result, (ushort)question.Class);       // Class (big-endian)
             }
 
-            return result.ToArray();
+            // Answers section
+            foreach (var answer in Answers)
+            {
+                result.AddRange(EncodeName(answer.Name));
+                WriteUInt16(result, (ushort)answer.Type);
+                WriteUInt16(result, (ushort)answer.Class);
+                WriteUInt32(result, answer.TTL);
+
+                var dataBytes = EncodeRecordData(answer);
+                WriteUInt16(result, (ushort)dataBytes.Length);
+                result.AddRange(dataBytes);
+            }
+
+            var resultArray = result.ToArray();
+
+            // Debug output with better formatting
+            System.Diagnostics.Debug.WriteLine($"mDNS query: {Questions.Count} questions, {resultArray.Length} bytes");
+            System.Diagnostics.Debug.WriteLine($"mDNS services: {string.Join(", ", Questions.Select(q => q.Name))}");
+            System.Diagnostics.Debug.WriteLine($"mDNS hex: {BitConverter.ToString(resultArray)}");
+
+            return resultArray;
         }
 
-        /// <summary>
-        /// Parses a DNS record from byte array
-        /// </summary>
+        // Helper method to write big-endian 16-bit values
+        private static void WriteUInt16(List<byte> buffer, ushort value)
+        {
+            buffer.Add((byte)(value >> 8));    // High byte first (big-endian)
+            buffer.Add((byte)(value & 0xFF));  // Low byte second
+        }
+
+        // Helper method to write big-endian 32-bit values
+        private static void WriteUInt32(List<byte> buffer, uint value)
+        {
+            buffer.Add((byte)(value >> 24));
+            buffer.Add((byte)(value >> 16));
+            buffer.Add((byte)(value >> 8));
+            buffer.Add((byte)(value & 0xFF));
+        }
+
+        private static void ParseRecords(byte[] data, ref int offset, int count, List<MdnsRecord> records, bool isQuestion)
+        {
+            for (int i = 0; i < count && offset < data.Length; i++)
+            {
+                var record = ParseRecord(data, ref offset, isQuestion);
+                if (record != null) records.Add(record);
+            }
+        }
+
         private static MdnsRecord? ParseRecord(byte[] data, ref int offset, bool isQuestion)
         {
             try
             {
-                var record = new MdnsRecord();
-
-                // Parse name (simplified)
-                record.Name = ParseName(data, ref offset);
-
-                if (offset + 4 > data.Length)
-                    return null;
-
-                record.Type = (MdnsRecordType)((data[offset] << 8) | data[offset + 1]);
-                offset += 2;
-                record.Class = (MdnsRecordClass)((data[offset] << 8) | data[offset + 1]);
-                offset += 2;
-
-                if (!isQuestion)
+                var record = new MdnsRecord
                 {
-                    if (offset + 6 > data.Length)
-                        return null;
+                    Name = ParseName(data, ref offset),
+                    Type = (MdnsRecordType)ReadUInt16(data, ref offset),
+                    Class = (MdnsRecordClass)ReadUInt16(data, ref offset)
+                };
 
-                    record.TTL = (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
-                    offset += 4;
-
-                    var dataLength = (ushort)((data[offset] << 8) | data[offset + 1]);
-                    offset += 2;
-
-                    if (offset + dataLength > data.Length)
-                        return null;
-
-                    // Parse data based on record type
-                    record.Data = ParseRecordData(data, offset, dataLength, record.Type);
-                    offset += dataLength;
+                if (!isQuestion && offset + 6 <= data.Length)
+                {
+                    record.TTL = ReadUInt32(data, ref offset);
+                    var dataLength = ReadUInt16(data, ref offset);
+                    if (offset + dataLength <= data.Length)
+                    {
+                        record.Data = ParseRecordData(data, offset, dataLength, record.Type);
+                        offset += dataLength;
+                    }
                 }
 
                 return record;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error parsing mDNS record: {ex.Message}");
                 return null;
             }
         }
 
-        /// <summary>
-        /// Parses DNS name from byte array
-        /// </summary>
         private static string ParseName(byte[] data, ref int offset)
         {
             var labels = new List<string>();
+            var jumped = false;
+            var originalOffset = offset;
 
             while (offset < data.Length)
             {
-                var length = data[offset++];
-
+                var length = data[offset];
                 if (length == 0)
-                    break;
-
-                if ((length & 0xC0) == 0xC0)
                 {
-                    // Compression pointer - not fully implemented
                     offset++;
                     break;
                 }
 
-                if (offset + length > data.Length)
-                    break;
+                if ((length & 0xC0) == 0xC0) // Compression
+                {
+                    if (!jumped) originalOffset = offset + 2;
+                    offset = ((length & 0x3F) << 8) | data[offset + 1];
+                    jumped = true;
+                    continue;
+                }
 
-                var label = Encoding.UTF8.GetString(data, offset, length);
-                labels.Add(label);
-                offset += length;
+                offset++;
+                if (offset + length <= data.Length)
+                {
+                    labels.Add(Encoding.UTF8.GetString(data, offset, length));
+                    offset += length;
+                }
             }
 
+            if (jumped) offset = originalOffset;
             return string.Join(".", labels);
         }
 
-        /// <summary>
-        /// Parses record data based on type
-        /// </summary>
         private static string? ParseRecordData(byte[] data, int offset, int length, MdnsRecordType type)
         {
             try
             {
-                switch (type)
+                return type switch
                 {
-                    case MdnsRecordType.A:
-                        if (length == 4)
-                        {
-                            return $"{data[offset]}.{data[offset + 1]}.{data[offset + 2]}.{data[offset + 3]}";
-                        }
-                        break;
+                    MdnsRecordType.A when length == 4 =>
+                        $"{data[offset]}.{data[offset + 1]}.{data[offset + 2]}.{data[offset + 3]}",
+                    MdnsRecordType.PTR => ParseName(data, ref offset),
+                    MdnsRecordType.TXT => ParseTxtRecord(data, offset, length),
+                    MdnsRecordType.SRV when length >= 6 => ParseSrvRecord(data, offset, length),
+                    _ => BitConverter.ToString(data, offset, Math.Min(length, 32))
+                };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error parsing record data: {ex.Message}");
+                return null;
+            }
+        }
 
-                    case MdnsRecordType.PTR:
-                    case MdnsRecordType.CNAME:
-                        var nameOffset = offset;
-                        return ParseName(data, ref nameOffset);
+        private static string ParseTxtRecord(byte[] data, int offset, int length)
+        {
+            var values = new List<string>();
+            int pos = offset;
+            int end = offset + length;
 
-                    case MdnsRecordType.TXT:
-                        return Encoding.UTF8.GetString(data, offset, length);
-
-                    case MdnsRecordType.SRV:
-                        if (length >= 6)
-                        {
-                            var priority = (ushort)((data[offset] << 8) | data[offset + 1]);
-                            var weight = (ushort)((data[offset + 2] << 8) | data[offset + 3]);
-                            var port = (ushort)((data[offset + 4] << 8) | data[offset + 5]);
-                            var srvOffset = offset + 6;
-                            var target = ParseName(data, ref srvOffset);
-                            return $"{priority} {weight} {port} {target}";
-                        }
-                        break;
+            while (pos < end)
+            {
+                var len = data[pos];
+                pos++;
+                if (pos + len <= end)
+                {
+                    values.Add(Encoding.UTF8.GetString(data, pos, len));
+                    pos += len;
                 }
+                else break;
+            }
+
+            return string.Join(";", values);
+        }
+
+        private static string ParseSrvRecord(byte[] data, int offset, int length)
+        {
+            var priority = ReadUInt16(data, offset);
+            var weight = ReadUInt16(data, offset + 2);
+            var port = ReadUInt16(data, offset + 4);
+            int nameOffset = offset + 6;
+            var target = ParseName(data, ref nameOffset);
+            return $"{priority},{weight},{port},{target}";
+        }
+
+        private static byte[] EncodeName(string name)
+        {
+            var result = new List<byte>();
+            if (string.IsNullOrEmpty(name))
+            {
+                result.Add(0);
+                return result.ToArray();
+            }
+
+            var parts = name.Split('.', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var part in parts)
+            {
+                var bytes = Encoding.UTF8.GetBytes(part);
+                if (bytes.Length > 63)
+                {
+                    System.Diagnostics.Debug.WriteLine($"mDNS: Label too long: {part} ({bytes.Length} bytes)");
+                    continue; // Skip invalid labels
+                }
+                result.Add((byte)bytes.Length);
+                result.AddRange(bytes);
+            }
+            result.Add(0); // Null terminator
+            return result.ToArray();
+        }
+
+        private static byte[] EncodeRecordData(MdnsRecord record)
+        {
+            if (string.IsNullOrEmpty(record.Data)) return Array.Empty<byte>();
+
+            try
+            {
+                return record.Type switch
+                {
+                    MdnsRecordType.A => record.Data.Split('.').Select(byte.Parse).ToArray(),
+                    MdnsRecordType.PTR => EncodeName(record.Data),
+                    MdnsRecordType.TXT => Encoding.UTF8.GetBytes(record.Data),
+                    _ => Encoding.UTF8.GetBytes(record.Data)
+                };
             }
             catch
             {
-                // Parsing error
+                return Array.Empty<byte>();
             }
-
-            return null;
         }
 
-        /// <summary>
-        /// Encodes a domain name as DNS labels
-        /// </summary>
-        private static byte[] EncodeNameAsLabels(string name)
+        private static ushort ReadUInt16(byte[] data, int offset)
         {
-            var result = new List<byte>();
-            var parts = name.Split('.');
+            return (ushort)((data[offset] << 8) | data[offset + 1]);
+        }
 
-            foreach (var part in parts)
-            {
-                if (!string.IsNullOrEmpty(part))
-                {
-                    var bytes = Encoding.UTF8.GetBytes(part);
-                    result.Add((byte)bytes.Length);
-                    result.AddRange(bytes);
-                }
-            }
+        private static ushort ReadUInt16(byte[] data, ref int offset)
+        {
+            var value = ReadUInt16(data, offset);
+            offset += 2;
+            return value;
+        }
 
-            result.Add(0); // End of name
-            return result.ToArray();
+        private static uint ReadUInt32(byte[] data, ref int offset)
+        {
+            var value = (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+            offset += 4;
+            return value;
         }
     }
 
-    /// <summary>
-    /// Represents an mDNS record
-    /// </summary>
     public class MdnsRecord
     {
         public string Name { get; set; } = string.Empty;
@@ -288,25 +339,17 @@ namespace wpfhikip.Discovery.Protocols.Mdns
         public string? Data { get; set; }
     }
 
-    /// <summary>
-    /// mDNS record types
-    /// </summary>
     public enum MdnsRecordType : ushort
     {
         A = 1,
         NS = 2,
         CNAME = 5,
-        SOA = 6,
         PTR = 12,
-        MX = 15,
         TXT = 16,
         AAAA = 28,
         SRV = 33
     }
 
-    /// <summary>
-    /// mDNS record classes
-    /// </summary>
     public enum MdnsRecordClass : ushort
     {
         IN = 1

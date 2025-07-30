@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using System.Net;
 
 namespace wpfhikip.Controls
 {
@@ -30,6 +31,9 @@ namespace wpfhikip.Controls
             this.GotFocus += IpAddressControl_GotFocus;
             this.MouseLeftButtonDown += IpAddressControl_MouseLeftButtonDown;
             this.Focusable = true; // Make the control itself focusable
+
+            // Add paste handling for the entire control
+            this.PreviewKeyDown += IpAddressControl_PreviewKeyDown;
         }
 
         /// <summary>
@@ -61,6 +65,104 @@ namespace wpfhikip.Controls
                 FocusFirstOctet();
                 e.Handled = true;
             }
+        }
+
+        private void IpAddressControl_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            // Handle Ctrl+V for paste
+            if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                HandlePaste();
+                e.Handled = true;
+            }
+        }
+
+        private void HandlePaste()
+        {
+            if (!Clipboard.ContainsText())
+                return;
+
+            var clipboardText = Clipboard.GetText();
+            var extractedIp = ExtractIpAddressFromText(clipboardText);
+
+            if (string.IsNullOrEmpty(extractedIp))
+            {
+                ShowIpValidationError("Invalid IP address format in clipboard. Supported formats:\n" +
+                                    "• xxx.xxx.xxx.xxx\n" +
+                                    "• http://xxx.xxx.xxx.xxx/\n" +
+                                    "• https://xxx.xxx.xxx.xxx/");
+                return;
+            }
+
+            if (!IsValidIpAddressFormat(extractedIp))
+            {
+                ShowIpValidationError("The clipboard contains an invalid IP address.\nPlease ensure the IP address is in correct format (0-255 for each octet).");
+                return;
+            }
+
+            // Set the IP address
+            IpAddress = extractedIp;
+        }
+
+        private string ExtractIpAddressFromText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+
+            text = text.Trim();
+
+            // Pattern 1: Direct IP address (86.49.161.121)
+            var directIpPattern = @"^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$";
+            var directMatch = Regex.Match(text, directIpPattern);
+            if (directMatch.Success)
+            {
+                return directMatch.Groups[1].Value;
+            }
+
+            // Pattern 2: HTTP URL (http://86.49.161.121/ or https://86.49.161.121/)
+            var urlPattern = @"^https?://(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/?.*$";
+            var urlMatch = Regex.Match(text, urlPattern, RegexOptions.IgnoreCase);
+            if (urlMatch.Success)
+            {
+                return urlMatch.Groups[1].Value;
+            }
+
+            // Pattern 3: Try to extract any IP-like pattern from the text
+            var anyIpPattern = @"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})";
+            var anyMatch = Regex.Match(text, anyIpPattern);
+            if (anyMatch.Success)
+            {
+                return anyMatch.Groups[1].Value;
+            }
+
+            return string.Empty;
+        }
+
+        private bool IsValidIpAddressFormat(string ipAddress)
+        {
+            if (string.IsNullOrWhiteSpace(ipAddress))
+                return false;
+
+            // Use IPAddress.TryParse for comprehensive validation
+            if (IPAddress.TryParse(ipAddress, out var ip))
+            {
+                // Ensure it's IPv4
+                var bytes = ip.GetAddressBytes();
+                if (bytes.Length == 4)
+                {
+                    // Additional validation for each octet to be between 0-255
+                    // IPAddress.TryParse already handles this, but let's be explicit
+                    return bytes.All(b => b >= 0 && b <= 255);
+                }
+            }
+
+            return false;
+        }
+
+        private void ShowIpValidationError(string message)
+        {
+            var parentWindow = Window.GetWindow(this);
+            MessageBox.Show(parentWindow, message, "Invalid IP Address", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         private static void OnIpAddressChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -128,6 +230,14 @@ namespace wpfhikip.Controls
         private void TextBox_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             var textBox = sender as TextBox;
+
+            // Handle Ctrl+V for paste in individual textboxes
+            if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                HandlePaste();
+                e.Handled = true;
+                return;
+            }
 
             // Handle backspace in empty field
             if (e.Key == Key.Back && string.IsNullOrEmpty(textBox.Text))

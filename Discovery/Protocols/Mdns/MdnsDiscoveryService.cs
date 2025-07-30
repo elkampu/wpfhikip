@@ -1,5 +1,4 @@
-﻿using System.Net;
-using System.Net.Sockets;
+﻿using System.Collections.Concurrent;
 
 using wpfhikip.Discovery.Core;
 using wpfhikip.Discovery.Models;
@@ -7,436 +6,384 @@ using wpfhikip.Discovery.Models;
 namespace wpfhikip.Discovery.Protocols.Mdns
 {
     /// <summary>
-    /// mDNS (Multicast DNS) / Bonjour discovery service
+    /// Fixed mDNS discovery service with improved resource management
     /// </summary>
     public class MdnsDiscoveryService : INetworkDiscoveryService, IDisposable
     {
         public string ServiceName => "mDNS/Bonjour";
-        public TimeSpan DefaultTimeout => TimeSpan.FromSeconds(10);
+        public TimeSpan DefaultTimeout => TimeSpan.FromSeconds(15);
 
-        private UdpClient? _udpClient;
-        private bool _disposed = false;
+        private MdnsNetworkManager? _networkManager;
+        private readonly MdnsQuerySender _querySender = new();
+        private readonly MdnsResponseListener _responseListener = new();
+        private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
+
+        private CancellationTokenSource? _currentCancellation;
+        private volatile bool _disposed;
 
         public event EventHandler<DeviceDiscoveredEventArgs>? DeviceDiscovered;
         public event EventHandler<DiscoveryProgressEventArgs>? ProgressChanged;
 
-        /// <summary>
-        /// Discovers devices using mDNS/Bonjour
-        /// </summary>
+        public MdnsDiscoveryService()
+        {
+            _responseListener.DeviceDiscovered += OnDeviceDiscovered;
+        }
+
         public async Task<IEnumerable<DiscoveredDevice>> DiscoverDevicesAsync(CancellationToken cancellationToken = default)
         {
-            var devices = new List<DiscoveredDevice>();
+            return await DiscoverDevicesAsync(null, cancellationToken);
+        }
 
+        public async Task<IEnumerable<DiscoveredDevice>> DiscoverDevicesAsync(string? networkSegment, CancellationToken cancellationToken = default)
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(MdnsDiscoveryService));
+
+            if (!await _operationSemaphore.WaitAsync(100, cancellationToken))
+                throw new InvalidOperationException("mDNS discovery already in progress");
+
+            List<Task>? listeningTasks = null;
             try
             {
-                InitializeUdpClient();
+                _currentCancellation?.Cancel();
+                _currentCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-                var serviceTypes = MdnsConstants.GetCommonServiceTypes();
-                var totalServices = serviceTypes.Length;
-                var currentService = 0;
+                var devices = new ConcurrentDictionary<string, DiscoveredDevice>();
 
-                foreach (var serviceType in serviceTypes)
+                ReportProgress(0, "Initializing mDNS discovery");
+
+                // Create fresh network manager for each discovery
+                _networkManager = new MdnsNetworkManager();
+
+                // Initialize network with proper setup
+                await _networkManager.InitializeAsync(_currentCancellation.Token);
+                if (!_networkManager.Clients.Any() || !_networkManager.Listeners.Any())
                 {
-                    if (cancellationToken.IsCancellationRequested)
-                        break;
-
-                    currentService++;
-                    ReportProgress(currentService, totalServices, serviceType, $"Querying for {serviceType}");
-
-                    var foundDevices = await QueryServiceTypeAsync(serviceType, cancellationToken);
-                    devices.AddRange(foundDevices);
-
-                    // Small delay between queries
-                    await Task.Delay(300, cancellationToken);
+                    ReportProgress(100, "No network interfaces available for mDNS");
+                    return Array.Empty<DiscoveredDevice>();
                 }
 
-                ReportProgress(totalServices, totalServices, "", "mDNS discovery completed");
+                // Get local IPs for filtering
+                var localIPs = GetLocalIPAddresses();
+                System.Diagnostics.Debug.WriteLine($"mDNS: Local IPs: {string.Join(", ", localIPs)}");
+
+                ReportProgress(20, "Starting mDNS listeners");
+
+                // Start listening on dedicated listener clients
+                listeningTasks = await _responseListener.StartListeningAsync(
+                    _networkManager, devices, networkSegment, _currentCancellation.Token);
+
+                ReportProgress(40, "Sending mDNS discovery queries");
+
+                // Send targeted mDNS queries
+                await SendTargetedQueriesAsync(_currentCancellation.Token);
+
+                ReportProgress(60, "Waiting for mDNS responses");
+
+                // Wait for responses with better monitoring
+                await WaitForResponsesAsync(devices, localIPs, _currentCancellation.Token);
+
+                ReportProgress(100, $"mDNS discovery complete - {devices.Count} total responses");
+
+                // Filter out our own responses and return external devices only
+                var externalDevices = devices.Values
+                    .Where(d => d.IPAddress != null && !localIPs.Contains(d.IPAddress.ToString()))
+                    .OrderBy(d => d.IPAddress?.ToString())
+                    .ToList();
+
+                System.Diagnostics.Debug.WriteLine($"mDNS: Found {externalDevices.Count} external devices after filtering");
+
+                return externalDevices;
             }
-            catch (OperationCanceledException)
+            finally
             {
-                // Expected when cancelled
-            }
-            catch (Exception ex)
-            {
-                ReportProgress(0, 0, "", $"mDNS error: {ex.Message}");
-            }
+                _operationSemaphore.Release();
 
-            return devices;
-        }
-
-        /// <summary>
-        /// Discovers devices on a specific network segment
-        /// </summary>
-        public async Task<IEnumerable<DiscoveredDevice>> DiscoverDevicesAsync(string networkSegment, CancellationToken cancellationToken = default)
-        {
-            // mDNS is multicast-based, filter results after discovery
-            var allDevices = await DiscoverDevicesAsync(cancellationToken);
-
-            if (string.IsNullOrEmpty(networkSegment))
-                return allDevices;
-
-            return allDevices.Where(device =>
-                device.IPAddress != null &&
-                NetworkUtils.IsIPInSegment(device.IPAddress, networkSegment));
-        }
-
-        /// <summary>
-        /// Queries for a specific mDNS service type
-        /// </summary>
-        private async Task<List<DiscoveredDevice>> QueryServiceTypeAsync(string serviceType, CancellationToken cancellationToken)
-        {
-            var devices = new List<DiscoveredDevice>();
-
-            if (_udpClient == null)
-                return devices;
-
-            try
-            {
-                // Create mDNS query
-                var query = MdnsMessage.CreateQuery(serviceType);
-                var queryBytes = query.ToByteArray();
-                var multicastEndpoint = new IPEndPoint(IPAddress.Parse(MdnsConstants.MulticastAddress), MdnsConstants.MulticastPort);
-
-                await _udpClient.SendAsync(queryBytes, queryBytes.Length, multicastEndpoint);
-
-                // Listen for responses
-                var listenTimeout = DateTime.UtcNow.Add(TimeSpan.FromSeconds(5));
-
-                while (DateTime.UtcNow < listenTimeout && !cancellationToken.IsCancellationRequested)
+                // Cleanup resources with proper timing
+                _ = Task.Run(async () =>
                 {
                     try
                     {
-                        var receiveTask = _udpClient.ReceiveAsync();
-                        var timeoutTask = Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+                        // Cancel current operations
+                        _currentCancellation?.Cancel();
 
-                        var completedTask = await Task.WhenAny(receiveTask, timeoutTask);
-
-                        if (completedTask == receiveTask)
+                        // Wait for listening tasks to complete with shorter timeout
+                        if (listeningTasks != null)
                         {
-                            var result = await receiveTask;
-                            var foundDevices = ParseMdnsResponse(result.Buffer, result.RemoteEndPoint, serviceType);
-
-                            foreach (var device in foundDevices)
+                            try
                             {
-                                if (!devices.Any(d => d.UniqueId == device.UniqueId))
-                                {
-                                    devices.Add(device);
-                                    DeviceDiscovered?.Invoke(this, new DeviceDiscoveredEventArgs(device, ServiceName));
-                                }
+                                await Task.WhenAll(listeningTasks).WaitAsync(TimeSpan.FromSeconds(1));
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                // Expected during cancellation
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Warning: Error waiting for listening tasks: {ex.Message}");
                             }
                         }
+
+                        // Small delay to allow final socket operations to complete
+                        await Task.Delay(100);
+
+                        // Dispose network manager
+                        _networkManager?.Dispose();
+                        _networkManager = null;
+
+                        System.Diagnostics.Debug.WriteLine("mDNS: Cleanup completed");
                     }
-                    catch (ObjectDisposedException)
+                    catch (Exception ex)
                     {
-                        break;
+                        System.Diagnostics.Debug.WriteLine($"Error during mDNS cleanup: {ex.Message}");
                     }
-                    catch (SocketException)
+                });
+            }
+        }
+
+        private HashSet<string> GetLocalIPAddresses()
+        {
+            var localIPs = new HashSet<string>();
+
+            // Add IPs from network manager clients
+            if (_networkManager != null)
+            {
+                foreach (var client in _networkManager.Clients)
+                {
+                    try
                     {
-                        break;
+                        if (client.Client.LocalEndPoint is System.Net.IPEndPoint localEP)
+                        {
+                            localIPs.Add(localEP.Address.ToString());
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore if client is disposed
                     }
                 }
             }
-            catch (Exception)
-            {
-                // Ignore individual query errors
-            }
 
-            return devices;
+            // Add common local IPs
+            try
+            {
+                var interfaces = wpfhikip.Discovery.Core.NetworkUtils.GetLocalNetworkInterfaces();
+                foreach (var iface in interfaces.Values)
+                {
+                    foreach (var addr in iface.IPv4Addresses)
+                    {
+                        localIPs.Add(addr.IPAddress.ToString());
+                    }
+                }
+            }
+            catch { }
+
+            return localIPs;
         }
 
-        /// <summary>
-        /// Parses mDNS response messages
-        /// </summary>
-        private List<DiscoveredDevice> ParseMdnsResponse(byte[] responseBytes, IPEndPoint remoteEndPoint, string serviceType)
+        private async Task SendTargetedQueriesAsync(CancellationToken cancellationToken)
         {
-            var devices = new List<DiscoveredDevice>();
+            if (_networkManager?.Clients.Any() != true) return;
+
+            var primaryClient = _networkManager.Clients.First();
 
             try
             {
-                var response = MdnsMessage.Parse(responseBytes);
-                if (response == null || !response.IsResponse)
-                    return devices;
+                // Phase 1: Universal service discovery (most likely to get responses)
+                System.Diagnostics.Debug.WriteLine("mDNS: Phase 1 - Universal service discovery");
+                await SendSingleQuery(primaryClient, "_services._dns-sd._udp.local.", cancellationToken);
+                await Task.Delay(500, cancellationToken);
 
-                var serviceRecords = response.Answers
-                    .Where(r => r.Type == MdnsRecordType.PTR && r.Name.Contains(serviceType))
-                    .ToList();
-
-                foreach (var serviceRecord in serviceRecords)
-                {
-                    var device = CreateDeviceFromMdnsRecord(response, serviceRecord, serviceType);
-                    if (device != null)
-                    {
-                        devices.Add(device);
-                    }
-                }
-            }
-            catch
-            {
-                // Parsing error - ignore
-            }
-
-            return devices;
-        }
-
-        /// <summary>
-        /// Creates a DiscoveredDevice from mDNS records
-        /// </summary>
-        private DiscoveredDevice? CreateDeviceFromMdnsRecord(MdnsMessage response, MdnsRecord serviceRecord, string serviceType)
-        {
-            try
-            {
-                // Extract service instance name
-                var serviceName = serviceRecord.Data;
-                if (string.IsNullOrEmpty(serviceName))
-                    return null;
-
-                // Find SRV record for this service
-                var srvRecord = response.Answers
-                    .FirstOrDefault(r => r.Type == MdnsRecordType.SRV && r.Name == serviceName);
-
-                // Find A records for the target host
-                var targetHost = srvRecord?.Data?.Split(' ').LastOrDefault();
-                var aRecord = response.Answers
-                    .FirstOrDefault(r => r.Type == MdnsRecordType.A && r.Name == targetHost);
-
-                if (aRecord?.Data == null || !IPAddress.TryParse(aRecord.Data, out var ipAddress))
-                    return null;
-
-                // Extract port from SRV record
-                var port = 80; // default
-                if (srvRecord?.Data != null)
-                {
-                    var srvParts = srvRecord.Data.Split(' ');
-                    if (srvParts.Length >= 3 && int.TryParse(srvParts[2], out var srvPort))
-                    {
-                        port = srvPort;
-                    }
-                }
-
-                var device = new DiscoveredDevice(ipAddress, port)
-                {
-                    UniqueId = serviceName,
-                    Name = ExtractServiceInstanceName(serviceName),
-                    DeviceType = DetermineDeviceType(serviceType, serviceName),
-                    Description = $"mDNS service: {serviceType}"
+                // Phase 2: Common Apple/Bonjour services (very likely to respond)
+                System.Diagnostics.Debug.WriteLine("mDNS: Phase 2 - Apple/Bonjour services");
+                var appleServices = new[] {
+                    "_airplay._tcp.local.",
+                    "_raop._tcp.local.",
+                    "_apple-mobdev2._tcp.local.",
+                    "_companion-link._tcp.local."
                 };
+                await SendQueryBatch(primaryClient, appleServices, cancellationToken);
+                await Task.Delay(1000, cancellationToken);
 
-                device.DiscoveryMethods.Add(DiscoveryMethod.mDNS);
-                device.DiscoveryData["mDNS_ServiceType"] = serviceType;
-                device.DiscoveryData["mDNS_ServiceName"] = serviceName;
-                device.DiscoveryData["mDNS_Response"] = response;
+                // Phase 3: Common network services
+                System.Diagnostics.Debug.WriteLine("mDNS: Phase 3 - Common network services");
+                var commonServices = new[] {
+                    "_http._tcp.local.",
+                    "_https._tcp.local.",
+                    "_printer._tcp.local.",
+                    "_ssh._tcp.local."
+                };
+                await SendQueryBatch(primaryClient, commonServices, cancellationToken);
+                await Task.Delay(1000, cancellationToken);
 
-                // Extract additional information from TXT records
-                var txtRecord = response.Answers
-                    .FirstOrDefault(r => r.Type == MdnsRecordType.TXT && r.Name == serviceName);
+                // Phase 4: Security/Camera services
+                System.Diagnostics.Debug.WriteLine("mDNS: Phase 4 - Security/Camera services");
+                var securityServices = new[] {
+                    "_onvif._tcp.local.",
+                    "_camera._tcp.local.",
+                    "_rtsp._tcp.local.",
+                    "_axis-video._tcp.local."
+                };
+                await SendQueryBatch(primaryClient, securityServices, cancellationToken);
+                await Task.Delay(1000, cancellationToken);
 
-                if (txtRecord?.Data != null)
-                {
-                    ExtractDeviceInfoFromTxt(device, txtRecord.Data);
-                }
-
-                return device;
+                // Phase 5: Broad discovery queries
+                System.Diagnostics.Debug.WriteLine("mDNS: Phase 5 - Broad discovery");
+                await SendSingleQuery(primaryClient, "_tcp.local.", cancellationToken);
             }
-            catch
+            catch (OperationCanceledException)
             {
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Extracts service instance name from full service name
-        /// </summary>
-        private string ExtractServiceInstanceName(string fullServiceName)
-        {
-            // Format: "Device Name._service._tcp.local."
-            var parts = fullServiceName.Split('.');
-            return parts.Length > 0 ? parts[0] : fullServiceName;
-        }
-
-        /// <summary>
-        /// Determines device type from mDNS service type
-        /// </summary>
-        private DeviceType DetermineDeviceType(string serviceType, string serviceName)
-        {
-            var service = serviceType.ToLower();
-            var name = serviceName.ToLower();
-
-            // Printers
-            if (service.Contains("ipp") || service.Contains("printer") || service.Contains("pdl-datastream"))
-                return DeviceType.Printer;
-
-            // Scanners
-            if (service.Contains("scanner") || service.Contains("scan"))
-                return DeviceType.Scanner;
-
-            // Media devices
-            if (service.Contains("airplay") || service.Contains("raop"))
-                return DeviceType.StreamingDevice;
-
-            if (service.Contains("mediaserver") || service.Contains("upnp"))
-                return DeviceType.MediaServer;
-
-            // Smart home devices
-            if (service.Contains("homekit") || name.Contains("homekit"))
-                return DeviceType.SmartSensor; // Generic smart device
-
-            // Apple devices
-            if (service.Contains("afpovertcp") || name.Contains("apple") || name.Contains("mac"))
-                return DeviceType.Workstation;
-
-            // Network infrastructure
-            if (service.Contains("router") || name.Contains("router"))
-                return DeviceType.Router;
-
-            // Web services (might be cameras, NAS, etc.)
-            if (service.Contains("http"))
-            {
-                if (name.Contains("camera") || name.Contains("ipcam"))
-                    return DeviceType.Camera;
-                if (name.Contains("nas") || name.Contains("synology") || name.Contains("qnap"))
-                    return DeviceType.NAS;
-            }
-
-            return DeviceType.Unknown;
-        }
-
-        /// <summary>
-        /// Extracts device information from TXT record data
-        /// </summary>
-        private void ExtractDeviceInfoFromTxt(DiscoveredDevice device, string txtData)
-        {
-            try
-            {
-                // TXT records contain key=value pairs
-                var attributes = ParseTxtAttributes(txtData);
-
-                foreach (var attr in attributes)
-                {
-                    switch (attr.Key.ToLower())
-                    {
-                        case "model":
-                        case "md":
-                            if (string.IsNullOrEmpty(device.Model))
-                                device.Model = attr.Value;
-                            break;
-
-                        case "manufacturer":
-                        case "mfg":
-                            if (string.IsNullOrEmpty(device.Manufacturer))
-                                device.Manufacturer = attr.Value;
-                            break;
-
-                        case "version":
-                        case "ver":
-                        case "firmware":
-                            if (string.IsNullOrEmpty(device.FirmwareVersion))
-                                device.FirmwareVersion = attr.Value;
-                            break;
-
-                        case "serial":
-                        case "sn":
-                            if (string.IsNullOrEmpty(device.SerialNumber))
-                                device.SerialNumber = attr.Value;
-                            break;
-
-                        case "features":
-                            device.Capabilities.UnionWith(attr.Value.Split(','));
-                            break;
-                    }
-
-                    // Store all attributes
-                    device.DiscoveryData[$"mDNS_TXT_{attr.Key}"] = attr.Value;
-                }
-            }
-            catch
-            {
-                // TXT parsing error - not critical
-            }
-        }
-
-        /// <summary>
-        /// Parses TXT record attributes
-        /// </summary>
-        private Dictionary<string, string> ParseTxtAttributes(string txtData)
-        {
-            var attributes = new Dictionary<string, string>();
-
-            // Simple parsing - in real implementation, would need proper TXT record parsing
-            var parts = txtData.Split('\0', StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var part in parts)
-            {
-                var equalIndex = part.IndexOf('=');
-                if (equalIndex > 0)
-                {
-                    var key = part.Substring(0, equalIndex);
-                    var value = part.Substring(equalIndex + 1);
-                    attributes[key] = value;
-                }
-            }
-
-            return attributes;
-        }
-
-        /// <summary>
-        /// Initializes UDP client for mDNS communication
-        /// </summary>
-        private void InitializeUdpClient()
-        {
-            if (_udpClient != null)
-                return;
-
-            try
-            {
-                _udpClient = new UdpClient();
-                _udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                _udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, 0));
-
-                // Join mDNS multicast group
-                var multicastAddress = IPAddress.Parse(MdnsConstants.MulticastAddress);
-                _udpClient.JoinMulticastGroup(multicastAddress);
+                // Expected during cancellation - suppress debug output
             }
             catch (Exception ex)
             {
-                _udpClient?.Dispose();
-                _udpClient = null;
-                throw new InvalidOperationException($"Failed to initialize mDNS client: {ex.Message}", ex);
+                System.Diagnostics.Debug.WriteLine($"Error in mDNS discovery: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// Reports discovery progress
-        /// </summary>
-        private void ReportProgress(int current, int total, string target, string status)
+        private async Task SendSingleQuery(System.Net.Sockets.UdpClient client, string service, CancellationToken cancellationToken)
         {
-            ProgressChanged?.Invoke(this, new DiscoveryProgressEventArgs(ServiceName, current, total, target, status));
+            try
+            {
+                var multicastEndpoint = new System.Net.IPEndPoint(
+                    System.Net.IPAddress.Parse(MdnsConstants.MulticastAddress),
+                    MdnsConstants.MulticastPort);
+
+                var query = MdnsMessage.CreateQuery(service);
+                var queryBytes = query.ToByteArray();
+
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                using var combined = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+
+                await client.SendAsync(queryBytes, multicastEndpoint).AsTask().WaitAsync(combined.Token);
+
+                System.Diagnostics.Debug.WriteLine($"mDNS: Sent query for {service}");
+            }
+            catch (ObjectDisposedException)
+            {
+                // Client disposed - suppress debug output for expected case
+            }
+            catch (OperationCanceledException)
+            {
+                // Query cancelled - suppress debug output for expected case
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to send mDNS query for {service}: {ex.Message}");
+            }
+        }
+
+        private async Task SendQueryBatch(System.Net.Sockets.UdpClient client, string[] services, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var multicastEndpoint = new System.Net.IPEndPoint(
+                    System.Net.IPAddress.Parse(MdnsConstants.MulticastAddress),
+                    MdnsConstants.MulticastPort);
+
+                var query = MdnsMessage.CreateQuery(services);
+                var queryBytes = query.ToByteArray();
+
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                using var combined = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+
+                await client.SendAsync(queryBytes, multicastEndpoint).AsTask().WaitAsync(combined.Token);
+
+                System.Diagnostics.Debug.WriteLine($"mDNS: Sent batch query for {services.Length} services");
+            }
+            catch (ObjectDisposedException)
+            {
+                // Client disposed - suppress debug output for expected case
+            }
+            catch (OperationCanceledException)
+            {
+                // Query cancelled - suppress debug output for expected case
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to send mDNS query batch: {ex.Message}");
+            }
+        }
+
+        private async Task WaitForResponsesAsync(ConcurrentDictionary<string, DiscoveredDevice> devices, HashSet<string> localIPs, CancellationToken cancellationToken)
+        {
+            var startTime = DateTime.UtcNow;
+            var lastExternalCount = 0;
+            var noChangeCount = 0;
+            var lastReportTime = DateTime.UtcNow;
+
+            while (DateTime.UtcNow - startTime < DefaultTimeout && !cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(500, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                var totalCount = devices.Count;
+                var externalCount = devices.Values.Count(d =>
+                    d.IPAddress != null && !localIPs.Contains(d.IPAddress.ToString()));
+
+                var elapsed = DateTime.UtcNow - startTime;
+                var progress = 60 + (int)(40 * elapsed.TotalSeconds / DefaultTimeout.TotalSeconds);
+
+                // Report progress every 2 seconds
+                if (DateTime.UtcNow - lastReportTime > TimeSpan.FromSeconds(2))
+                {
+                    ReportProgress(Math.Min(progress, 99),
+                        $"Total: {totalCount} responses, External: {externalCount} devices ({elapsed.TotalSeconds:F0}s)");
+                    lastReportTime = DateTime.UtcNow;
+                }
+
+                // Track external devices for early termination
+                if (externalCount == lastExternalCount)
+                {
+                    noChangeCount++;
+                    if (noChangeCount >= 6 && elapsed.TotalSeconds > 8) // 3 seconds of no new external devices
+                    {
+                        System.Diagnostics.Debug.WriteLine($"mDNS: Early termination - no new external devices for 3 seconds");
+                        break;
+                    }
+                }
+                else
+                {
+                    noChangeCount = 0;
+                    lastExternalCount = externalCount;
+                    if (externalCount > 0)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"mDNS: Found {externalCount} external devices so far");
+                    }
+                }
+            }
+
+            var finalTotal = devices.Count;
+            var finalExternal = devices.Values.Count(d =>
+                d.IPAddress != null && !localIPs.Contains(d.IPAddress.ToString()));
+
+            System.Diagnostics.Debug.WriteLine($"mDNS: Final results - Total: {finalTotal}, External: {finalExternal}");
+        }
+
+        private void OnDeviceDiscovered(object? sender, DeviceDiscoveredEventArgs e)
+        {
+            DeviceDiscovered?.Invoke(this, e);
+        }
+
+        private void ReportProgress(int percent, string status)
+        {
+            ProgressChanged?.Invoke(this, new DiscoveryProgressEventArgs(ServiceName, percent, 100, "", status));
         }
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
+            if (_disposed) return;
+            _disposed = true;
 
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!_disposed)
-            {
-                if (disposing)
-                {
-                    try
-                    {
-                        _udpClient?.Close();
-                        _udpClient?.Dispose();
-                    }
-                    catch
-                    {
-                        // Ignore disposal errors
-                    }
-                }
-
-                _disposed = true;
-            }
+            _currentCancellation?.Cancel();
+            _networkManager?.Dispose();
+            _operationSemaphore?.Dispose();
+            _currentCancellation?.Dispose();
         }
     }
 }

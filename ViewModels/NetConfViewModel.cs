@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -13,6 +14,7 @@ namespace wpfhikip.ViewModels
     public class NetConfViewModel : ViewModelBase
     {
         private const int PingTimeout = 3000;
+        private const int PortTimeout = 5000;
 
         private ObservableCollection<Camera> _cameras = new();
         private bool _isCheckingCompatibility;
@@ -172,10 +174,43 @@ namespace wpfhikip.ViewModels
 
                 await InitializeCameraCheck(camera, cancellationToken);
 
-                // Use the generic ProtocolManager
-                var result = await ProtocolManager.CheckCompatibilityAsync(camera, cancellationToken);
+                // Step 1: Always perform connectivity checks first (ping + port)
+                var connectivityResult = await CheckConnectivityAsync(camera, cancellationToken);
+                if (!connectivityResult.CanConnect)
+                {
+                    camera.AddProtocolLog("System", "Connectivity Check",
+                        "Connectivity check failed. Skipping protocol detection.", ProtocolLogLevel.Error);
 
-                SetFinalStatus(camera, result);
+                    var result = ProtocolCompatibilityResult.CreateFailure(
+                        $"Cannot reach {camera.CurrentIP}:{camera.EffectivePort} - {connectivityResult.Message}");
+                    SetFinalStatus(camera, result);
+                    return;
+                }
+
+                camera.AddProtocolLog("System", "Connectivity Check",
+                    $"Connectivity confirmed: {connectivityResult.Message}", ProtocolLogLevel.Success);
+
+                // Step 2: Check if a specific protocol is selected (not Auto)
+                ProtocolCompatibilityResult protocolResult;
+                if (camera.Protocol != CameraProtocol.Auto)
+                {
+                    camera.AddProtocolLog("System", "Protocol Selection",
+                        $"Specific protocol selected: {camera.Protocol}. Checking selected protocol first.");
+
+                    protocolResult = await CheckSpecificProtocolAsync(camera, cancellationToken);
+                    if (protocolResult.IsCompatible)
+                    {
+                        SetFinalStatus(camera, protocolResult);
+                        return;
+                    }
+
+                    camera.AddProtocolLog("System", "Protocol Selection",
+                        $"Selected protocol {camera.Protocol} failed. Falling back to auto-detection.");
+                }
+
+                // Step 3: Proceed with full protocol detection
+                protocolResult = await ProtocolManager.CheckCompatibilityAsync(camera, cancellationToken);
+                SetFinalStatus(camera, protocolResult);
             }
             catch (OperationCanceledException)
             {
@@ -188,29 +223,116 @@ namespace wpfhikip.ViewModels
             }
         }
 
-        private async Task InitializeCameraCheck(Camera camera, CancellationToken cancellationToken)
+        private async Task<ProtocolCompatibilityResult> CheckSpecificProtocolAsync(Camera camera, CancellationToken cancellationToken)
         {
-            camera.ClearProtocolLogs();
-            camera.AddProtocolLog("System", "Starting Protocol Check",
-                $"Beginning compatibility check for {camera.CurrentIP}:{camera.EffectivePort}");
+            try
+            {
+                camera.AddProtocolLog(camera.Protocol.ToString(), "Specific Protocol Check",
+                    $"Testing selected protocol: {camera.Protocol}");
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    camera.Status = $"Checking {camera.Protocol} protocol...";
+                });
+
+                return await ProtocolManager.CheckSingleProtocolAsync(camera, camera.Protocol, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                camera.AddProtocolLog(camera.Protocol.ToString(), "Specific Protocol Error",
+                    $"Error checking {camera.Protocol}: {ex.Message}", ProtocolLogLevel.Error);
+                return ProtocolCompatibilityResult.CreateFailure($"Protocol check failed: {ex.Message}", camera.Protocol);
+            }
+        }
+
+        private async Task<ConnectivityResult> CheckConnectivityAsync(Camera camera, CancellationToken cancellationToken)
+        {
+            camera.AddProtocolLog("Network", "Connectivity Check",
+                $"Checking connectivity to {camera.CurrentIP}:{camera.EffectivePort}");
 
             Application.Current.Dispatcher.Invoke(() =>
             {
                 camera.Status = "Checking connectivity...";
-                camera.CellColor = Brushes.LightYellow;
             });
 
+            // Step 1: Ping check
             var isPingSuccessful = await PingCameraAsync(camera.CurrentIP ?? string.Empty);
-            cancellationToken.ThrowIfCancellationRequested();
-
             LogPingResult(camera, isPingSuccessful);
+
+            // Step 2: Port connectivity check
+            var isPortAvailable = await CheckPortAvailabilityAsync(camera.CurrentIP ?? string.Empty, camera.EffectivePort, cancellationToken);
+            LogPortResult(camera, isPortAvailable);
+
+            // Determine overall connectivity
+            if (isPingSuccessful && isPortAvailable)
+            {
+                return new ConnectivityResult(true, "Ping and port check successful");
+            }
+            else if (!isPingSuccessful && isPortAvailable)
+            {
+                return new ConnectivityResult(true, "Port accessible (ping may be blocked)");
+            }
+            else if (isPingSuccessful && !isPortAvailable)
+            {
+                return new ConnectivityResult(false, "Host reachable but port not accessible");
+            }
+            else
+            {
+                return new ConnectivityResult(false, "Host unreachable and port not accessible");
+            }
+        }
+
+        private static async Task<bool> CheckPortAvailabilityAsync(string ipAddress, int port, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrEmpty(ipAddress))
+                return false;
+
+            try
+            {
+                using var tcpClient = new TcpClient();
+                using var timeoutCts = new CancellationTokenSource(PortTimeout);
+                using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+                await tcpClient.ConnectAsync(ipAddress, port, combinedCts.Token);
+                return tcpClient.Connected;
+            }
+            catch (SocketException)
+            {
+                return false;
+            }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void LogPortResult(Camera camera, bool isPortAvailable)
+        {
+            var level = isPortAvailable ? ProtocolLogLevel.Success : ProtocolLogLevel.Warning;
+            var message = isPortAvailable
+                ? $"Port {camera.EffectivePort} is accessible"
+                : $"Port {camera.EffectivePort} is not accessible or connection timeout";
+
+            camera.AddProtocolLog("Network", isPortAvailable ? "Port Check Success" : "Port Check Failed", message, level);
+        }
+
+        private async Task InitializeCameraCheck(Camera camera, CancellationToken cancellationToken)
+        {
+            camera.ClearProtocolLogs();
+            camera.AddProtocolLog("System", "Starting Compatibility Check",
+                $"Beginning enhanced compatibility check for {camera.CurrentIP}:{camera.EffectivePort}");
 
             Application.Current.Dispatcher.Invoke(() =>
             {
-                camera.Status = isPingSuccessful
-                    ? $"Ping OK, checking protocols on port {camera.EffectivePort}..."
-                    : $"Ping failed, trying protocols on port {camera.EffectivePort}...";
+                camera.Status = "Starting compatibility check...";
+                camera.CellColor = Brushes.LightYellow;
             });
+
+            cancellationToken.ThrowIfCancellationRequested();
         }
 
         private static async Task<bool> PingCameraAsync(string ipAddress)
@@ -470,5 +592,10 @@ namespace wpfhikip.ViewModels
         {
             // Implementation for adding camera range
         }
+
+        /// <summary>
+        /// Represents the result of connectivity checks (ping + port)
+        /// </summary>
+        private sealed record ConnectivityResult(bool CanConnect, string Message);
     }
 }

@@ -1,192 +1,396 @@
 ﻿using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
 namespace wpfhikip.Discovery.Protocols.Mdns
 {
     /// <summary>
-    /// Properly configured mDNS network management with improved disposal
+    /// mDNS network interface management - local queries only, listen to all responses
     /// </summary>
     internal class MdnsNetworkManager : IDisposable
     {
-        private readonly List<UdpClient> _clients = new();
-        private readonly List<UdpClient> _listeners = new();
-        private readonly object _disposeLock = new();
+        private readonly List<UdpClient> _sendingClients = new();
+        private readonly List<UdpClient> _listeningClients = new();
+        private readonly Dictionary<int, NetworkInterface> _activeInterfaces = new();
+        private readonly object _lock = new();
         private volatile bool _disposed;
 
-        public IReadOnlyList<UdpClient> Clients => _clients.AsReadOnly();
-        public IReadOnlyList<UdpClient> Listeners => _listeners.AsReadOnly();
+        public IReadOnlyList<NetworkInterface> ActiveInterfaces => _activeInterfaces.Values.ToList();
 
-        /// <summary>
-        /// Initialize UDP clients for mDNS with proper multicast setup
-        /// </summary>
         public async Task InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(MdnsNetworkManager));
-
-            await Task.Run(() =>
+            lock (_lock)
             {
-                // Create sending clients (bound to any port)
-                CreateSendingClients();
+                if (_disposed) return;
 
-                // Create listening clients (bound to mDNS port 5353)
-                CreateListeningClients();
+                Cleanup();
+                _activeInterfaces.Clear();
+            }
 
-                System.Diagnostics.Debug.WriteLine($"mDNS: Created {_clients.Count} sending clients and {_listeners.Count} listening clients");
-            }, cancellationToken);
+            var interfaces = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(IsValidInterface)
+                .ToList();
+
+            System.Diagnostics.Debug.WriteLine($"mDNS: Found {interfaces.Count} valid network interfaces");
+
+            foreach (var networkInterface in interfaces)
+            {
+                try
+                {
+                    await SetupInterface(networkInterface, cancellationToken);
+                    _activeInterfaces[networkInterface.GetHashCode()] = networkInterface;
+                    System.Diagnostics.Debug.WriteLine($"mDNS: Initialized interface {networkInterface.Name}");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"mDNS: Failed to setup interface {networkInterface.Name}: {ex.Message}");
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine($"mDNS: {_sendingClients.Count} sending clients, {_listeningClients.Count} listening clients (local queries only)");
         }
 
-        private void CreateSendingClients()
+        public async Task ReinitializeAsync()
+        {
+            await InitializeAsync();
+        }
+
+        private static bool IsValidInterface(NetworkInterface networkInterface)
+        {
+            // Accept more interface types to ensure broader listening coverage
+            if (networkInterface.OperationalStatus != OperationalStatus.Up)
+                return false;
+
+            // Skip only loopback interfaces - allow tunnels and others for listening
+            if (networkInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                return false;
+
+            // Must have IPv4 addresses
+            var properties = networkInterface.GetIPProperties();
+            return properties.UnicastAddresses.Any(addr =>
+                addr.Address.AddressFamily == AddressFamily.InterNetwork &&
+                !IPAddress.IsLoopback(addr.Address));
+        }
+
+        private async Task SetupInterface(NetworkInterface networkInterface, CancellationToken cancellationToken)
+        {
+            var properties = networkInterface.GetIPProperties();
+            var ipv4Addresses = properties.UnicastAddresses
+                .Where(addr => addr.Address.AddressFamily == AddressFamily.InterNetwork)
+                .Select(addr => addr.Address)
+                .ToList();
+
+            foreach (var localAddress in ipv4Addresses)
+            {
+                try
+                {
+                    // Create sending client for LOCAL subnet queries only
+                    var sendingClient = CreateLocalSendingClient(localAddress);
+                    if (sendingClient != null)
+                    {
+                        _sendingClients.Add(sendingClient);
+                    }
+
+                    // Create listening client for ALL responses (including cross-subnet)
+                    var listeningClient = CreateGlobalListeningClient(localAddress);
+                    if (listeningClient != null)
+                    {
+                        _listeningClients.Add(listeningClient);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"mDNS: Error setting up {localAddress} on {networkInterface.Name}: {ex.Message}");
+                }
+            }
+        }
+
+        private UdpClient? CreateLocalSendingClient(IPAddress localAddress)
         {
             try
             {
-                // Primary sending client
+                var client = new UdpClient(new IPEndPoint(localAddress, 0));
+
+                // Standard multicast configuration for LOCAL subnet only
+                client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+
+                // Use standard TTL (1) to limit to local subnet
+                client.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 1);
+                client.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastInterface, localAddress.GetAddressBytes());
+
+                // Enable multicast loopback for local reception
+                client.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback, true);
+
+                return client;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"mDNS: Failed to create local sending client for {localAddress}: {ex.Message}");
+                return null;
+            }
+        }
+
+        private UdpClient? CreateGlobalListeningClient(IPAddress localAddress)
+        {
+            try
+            {
                 var client = new UdpClient();
                 client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                client.Client.Bind(new IPEndPoint(IPAddress.Any, 0)); // Any available port for sending
 
-                // Enable multicast
-                var multicastAddr = IPAddress.Parse(MdnsConstants.MulticastAddress);
-                client.JoinMulticastGroup(multicastAddr);
-                client.MulticastLoopback = false; // Don't receive our own packets
+                // Bind to ANY to receive from ALL sources (including cross-subnet)
+                client.Client.Bind(new IPEndPoint(IPAddress.Any, MdnsConstants.MulticastPort));
 
-                _clients.Add(client);
-                System.Diagnostics.Debug.WriteLine($"mDNS: Created primary sending client on port {((IPEndPoint)client.Client.LocalEndPoint!).Port}");
+                // Join multicast group for this interface
+                var multicastAddress = IPAddress.Parse(MdnsConstants.MulticastAddress);
+                client.JoinMulticastGroup(multicastAddress, localAddress);
 
-                // Create interface-specific sending clients
-                var interfaces = wpfhikip.Discovery.Core.NetworkUtils.GetLocalNetworkInterfaces();
-                foreach (var interfaceInfo in interfaces.Values.Take(2)) // Limit to 2 additional interfaces
+                return client;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"mDNS: Failed to create global listening client for {localAddress}: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task SendQueryAsync(string[] services, CancellationToken cancellationToken)
+        {
+            if (_disposed || !_sendingClients.Any()) return;
+
+            var query = MdnsMessage.CreateQuery(services);
+            var queryBytes = query.ToByteArray();
+            var multicastEndpoint = new IPEndPoint(IPAddress.Parse(MdnsConstants.MulticastAddress), MdnsConstants.MulticastPort);
+
+            // Send multicast queries to LOCAL subnet only
+            var sendTasks = _sendingClients.Select(async client =>
+            {
+                try
                 {
-                    foreach (var address in interfaceInfo.IPv4Addresses.Take(1))
+                    using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+
+                    await client.SendAsync(queryBytes, multicastEndpoint).AsTask().WaitAsync(timeoutCts.Token);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Client disposed - ignore
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"mDNS: Local send error: {ex.Message}");
+                }
+            });
+
+            await Task.WhenAll(sendTasks);
+            System.Diagnostics.Debug.WriteLine($"mDNS: Sent local subnet queries only (TTL=1)");
+        }
+
+        public async Task SendUnicastQueryAsync(string[] services, IPAddress target, CancellationToken cancellationToken)
+        {
+            // Only allow unicast queries to LOCAL subnet addresses
+            if (!IsLocalSubnet(target))
+            {
+                System.Diagnostics.Debug.WriteLine($"mDNS: Skipping cross-subnet unicast query to {target}");
+                return;
+            }
+
+            var query = MdnsMessage.CreateQuery(services);
+            var queryBytes = query.ToByteArray();
+            var endpoint = new IPEndPoint(target, MdnsConstants.MulticastPort);
+
+            foreach (var client in _sendingClients)
+            {
+                try
+                {
+                    await client.SendAsync(queryBytes, endpoint);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"mDNS: Local unicast send error to {target}: {ex.Message}");
+                }
+            }
+        }
+
+        private bool IsLocalSubnet(IPAddress targetAddress)
+        {
+            try
+            {
+                foreach (var networkInterface in _activeInterfaces.Values)
+                {
+                    var properties = networkInterface.GetIPProperties();
+                    foreach (var unicast in properties.UnicastAddresses)
                     {
-                        CreateInterfaceSendingClient(address.IPAddress);
+                        if (unicast.Address.AddressFamily == AddressFamily.InterNetwork)
+                        {
+                            var localNetwork = GetNetworkAddress(unicast.Address, unicast.IPv4Mask);
+                            var targetNetwork = GetNetworkAddress(targetAddress, unicast.IPv4Mask);
+
+                            if (localNetwork != null && targetNetwork != null && localNetwork.Equals(targetNetwork))
+                            {
+                                return true;
+                            }
+                        }
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to create sending clients: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error checking if {targetAddress} is local subnet: {ex.Message}");
             }
+
+            return false;
         }
 
-        private void CreateListeningClients()
+        private IPAddress? GetNetworkAddress(IPAddress ipAddress, IPAddress subnetMask)
         {
             try
             {
-                // Primary listening client bound to mDNS port
-                var listener = new UdpClient();
-                listener.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                listener.Client.Bind(new IPEndPoint(IPAddress.Any, MdnsConstants.MulticastPort));
+                var ipBytes = ipAddress.GetAddressBytes();
+                var maskBytes = subnetMask.GetAddressBytes();
+                var networkBytes = new byte[4];
 
-                // Join multicast group
-                var multicastAddr = IPAddress.Parse(MdnsConstants.MulticastAddress);
-                listener.JoinMulticastGroup(multicastAddr);
-
-                _listeners.Add(listener);
-                System.Diagnostics.Debug.WriteLine($"mDNS: Created primary listening client on port {MdnsConstants.MulticastPort}");
-
-                // Create interface-specific listeners
-                var interfaces = wpfhikip.Discovery.Core.NetworkUtils.GetLocalNetworkInterfaces();
-                foreach (var interfaceInfo in interfaces.Values.Take(2))
+                for (int i = 0; i < 4; i++)
                 {
-                    foreach (var address in interfaceInfo.IPv4Addresses.Take(1))
+                    networkBytes[i] = (byte)(ipBytes[i] & maskBytes[i]);
+                }
+
+                return new IPAddress(networkBytes);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public async Task ListenForResponsesAsync(NetworkInterface networkInterface, Action<byte[], IPEndPoint> onResponse, CancellationToken cancellationToken)
+        {
+            await ListenForResponsesAsync(networkInterface, onResponse, TimeSpan.FromMinutes(5), cancellationToken);
+        }
+
+        public async Task ListenForResponsesAsync(NetworkInterface networkInterface, Action<byte[], IPEndPoint> onResponse, TimeSpan listenDuration, CancellationToken cancellationToken)
+        {
+            // Get all listening clients (not interface-specific since we bind to ANY)
+            var relevantClients = _listeningClients.ToList();
+
+            if (!relevantClients.Any())
+            {
+                System.Diagnostics.Debug.WriteLine($"mDNS: No listening clients available for {networkInterface.Name}");
+                return;
+            }
+
+            // Create a timeout cancellation token that combines the provided cancellation token with the listen duration
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(listenDuration);
+
+            var listenTasks = relevantClients.Select(client => ListenOnClientAsync(client, onResponse, timeoutCts.Token)).ToList();
+
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"mDNS: Starting to listen for responses for {listenDuration.TotalMinutes:F1} minutes on {relevantClients.Count} clients");
+                await Task.WhenAny(listenTasks);
+            }
+            catch (OperationCanceledException) when (timeoutCts.Token.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                System.Diagnostics.Debug.WriteLine($"mDNS: Listen duration of {listenDuration.TotalMinutes:F1} minutes completed");
+            }
+            catch (OperationCanceledException)
+            {
+                System.Diagnostics.Debug.WriteLine("mDNS: Listening cancelled by user");
+            }
+        }
+
+        private async Task ListenOnClientAsync(UdpClient client, Action<byte[], IPEndPoint> onResponse, CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested && !_disposed)
+                {
+                    var result = await client.ReceiveAsync().WaitAsync(cancellationToken);
+
+                    // Log all received responses for debugging
+                    System.Diagnostics.Debug.WriteLine($"mDNS: Received response from {result.RemoteEndPoint.Address} ({result.Buffer.Length} bytes)");
+
+                    // Log cross-subnet responses for debugging
+                    if (!IsLocalSubnet(result.RemoteEndPoint.Address))
                     {
-                        CreateInterfaceListeningClient(address.IPAddress);
+                        System.Diagnostics.Debug.WriteLine($"mDNS: Processing cross-subnet response from {result.RemoteEndPoint.Address}");
                     }
+
+                    onResponse(result.Buffer, result.RemoteEndPoint);
                 }
             }
+            catch (ObjectDisposedException)
+            {
+                // Client disposed - ignore
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected
+            }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to create listening clients: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"mDNS: Listen error: {ex.Message}");
             }
         }
 
-        private void CreateInterfaceSendingClient(IPAddress localAddress)
+        private static bool IsClientForInterface(UdpClient client, NetworkInterface networkInterface)
         {
             try
             {
-                var client = new UdpClient();
-                client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                client.Client.Bind(new IPEndPoint(localAddress, 0)); // Any available port
-
-                var multicastAddr = IPAddress.Parse(MdnsConstants.MulticastAddress);
-                client.JoinMulticastGroup(multicastAddr, localAddress);
-                client.MulticastLoopback = false;
-
-                _clients.Add(client);
-                System.Diagnostics.Debug.WriteLine($"mDNS: Created interface sending client for {localAddress}");
+                if (client.Client.LocalEndPoint is IPEndPoint localEP)
+                {
+                    var properties = networkInterface.GetIPProperties();
+                    return properties.UnicastAddresses.Any(addr => addr.Address.Equals(localEP.Address));
+                }
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to create interface sending client for {localAddress}: {ex.Message}");
+                // Ignore errors
+            }
+            return false;
+        }
+
+        public void StopListening()
+        {
+            lock (_lock)
+            {
+                Cleanup();
             }
         }
 
-        private void CreateInterfaceListeningClient(IPAddress localAddress)
+        private void Cleanup()
         {
-            try
+            foreach (var client in _sendingClients.Concat(_listeningClients))
             {
-                var listener = new UdpClient();
-                listener.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                listener.Client.Bind(new IPEndPoint(localAddress, MdnsConstants.MulticastPort));
-
-                var multicastAddr = IPAddress.Parse(MdnsConstants.MulticastAddress);
-                listener.JoinMulticastGroup(multicastAddr, localAddress);
-
-                _listeners.Add(listener);
-                System.Diagnostics.Debug.WriteLine($"mDNS: Created interface listening client for {localAddress}");
+                try
+                {
+                    client?.Close();
+                    client?.Dispose();
+                }
+                catch
+                {
+                    // Ignore cleanup errors
+                }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to create interface listening client for {localAddress}: {ex.Message}");
-            }
+
+            _sendingClients.Clear();
+            _listeningClients.Clear();
         }
 
         public void Dispose()
         {
-            lock (_disposeLock)
+            if (_disposed) return;
+            _disposed = true;
+
+            lock (_lock)
             {
-                if (_disposed) return;
-                _disposed = true;
-
-                System.Diagnostics.Debug.WriteLine("mDNS: Starting graceful disposal of network resources");
-
-                // Dispose clients safely
-                DisposeClients(_clients, "sending");
-                DisposeClients(_listeners, "listening");
-
-                _clients.Clear();
-                _listeners.Clear();
-
-                System.Diagnostics.Debug.WriteLine("mDNS: Network resource disposal complete");
+                Cleanup();
+                _activeInterfaces.Clear();
             }
         }
-
-        private static void DisposeClients(List<UdpClient> clients, string type)
-        {
-            foreach (var client in clients)
-            {
-                try
-                {
-                    // First try to close gracefully
-                    client.Close();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Warning: Error closing {type} client: {ex.Message}");
-                }
-
-                try
-                {
-                    // Then dispose
-                    client.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Warning: Error disposing {type} client: {ex.Message}");
-                }
-            }
-        }
-
-        public bool IsDisposed => _disposed;
     }
 }

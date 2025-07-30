@@ -339,19 +339,32 @@ namespace wpfhikip.Discovery.Protocols.Mdns
         public string? Data { get; set; }
     }
 
+    /// <summary>
+    /// mDNS record types as defined in RFC 6762
+    /// </summary>
     public enum MdnsRecordType : ushort
     {
-        A = 1,
-        NS = 2,
-        CNAME = 5,
-        PTR = 12,
-        TXT = 16,
-        AAAA = 28,
-        SRV = 33
+        A = 1,      // IPv4 address record
+        NS = 2,     // Name server record
+        CNAME = 5,  // Canonical name record
+        SOA = 6,    // Start of authority record
+        PTR = 12,   // Pointer record
+        MX = 15,    // Mail exchange record
+        TXT = 16,   // Text record
+        AAAA = 28,  // IPv6 address record
+        SRV = 33,   // Service record
+        ANY = 255   // Any record type
     }
 
+    /// <summary>
+    /// mDNS record classes as defined in RFC 6762
+    /// </summary>
     public enum MdnsRecordClass : ushort
     {
-        IN = 1
+        IN = 1,     // Internet class
+        CS = 2,     // CSNET class (obsolete)
+        CH = 3,     // CHAOS class
+        HS = 4,     // Hesiod class
+        ANY = 255   // Any class
     }
 }

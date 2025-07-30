@@ -55,8 +55,49 @@ namespace wpfhikip.Protocols.Onvif
         /// </summary>
         public static bool IsSoapFault(string soapResponse)
         {
-            return soapResponse.Contains("soap:Fault") || soapResponse.Contains("env:Fault") ||
-                   soapResponse.Contains("Fault", StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(soapResponse))
+                return false;
+
+            var faultIndicators = new[]
+            {
+                "soap:Fault",
+                "env:Fault",
+                "s:Fault",
+                "<Fault",
+                "faultcode",
+                "faultstring",
+                "ter:InvalidCredentials",
+                "ter:NotAuthorized"
+            };
+
+            return faultIndicators.Any(indicator =>
+                soapResponse.Contains(indicator, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// Extracts SOAP fault string from response
+        /// </summary>
+        public static string ExtractSoapFaultString(string soapResponse)
+        {
+            try
+            {
+                var doc = XDocument.Parse(soapResponse);
+                var faultString = doc.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName.Equals("faultstring", StringComparison.OrdinalIgnoreCase))?.Value;
+
+                if (string.IsNullOrEmpty(faultString))
+                {
+                    // Try to find fault text
+                    faultString = doc.Descendants()
+                        .FirstOrDefault(e => e.Name.LocalName.Equals("text", StringComparison.OrdinalIgnoreCase))?.Value;
+                }
+
+                return faultString ?? "Unknown SOAP fault";
+            }
+            catch
+            {
+                return "Unable to parse SOAP fault";
+            }
         }
 
         /// <summary>
@@ -74,8 +115,13 @@ namespace wpfhikip.Protocols.Onvif
                 "tt:",
                 "GetDeviceInformationResponse",
                 "GetCapabilitiesResponse",
+                "GetSystemDateAndTimeResponse",
                 "soap:Envelope",
-                "env:Envelope"
+                "s:Envelope",
+                "env:Envelope",
+                "xmlns:tds",
+                "xmlns:tt",
+                "xmlns:ter"
             };
 
             return onvifIndicators.Any(indicator =>
@@ -85,14 +131,14 @@ namespace wpfhikip.Protocols.Onvif
         /// <summary>
         /// Creates SOAP envelope with WS-Security authentication
         /// </summary>
-        public static string CreateAuthenticatedSoapEnvelope(string body, string username, string password, string action)
+        public static string CreateAuthenticatedSoapEnvelope(string body, string username, string password, string action = "")
         {
             var timestamp = DateTime.UtcNow;
             var nonce = GenerateNonce();
             var passwordDigest = GeneratePasswordDigest(nonce, timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"), password);
 
-            return $@"<?xml version=""1.0"" encoding=""UTF-8""?>
-<soap:Envelope xmlns:soap=""http://www.w3.org/2003/05/soap-envelope"" 
+            return $@"<?xml version=""1.0"" encoding=""utf-8""?>
+<soap:Envelope xmlns:soap=""http://schemas.xmlsoap.org/soap/"" 
                xmlns:tds=""http://www.onvif.org/ver10/device/wsdl""
                xmlns:tt=""http://www.onvif.org/ver10/schema"">
     <soap:Header>
@@ -105,7 +151,6 @@ namespace wpfhikip.Protocols.Onvif
                 <wsu:Created>{timestamp:yyyy-MM-ddTHH:mm:ss.fffZ}</wsu:Created>
             </wsse:UsernameToken>
         </wsse:Security>
-        <wsa:Action xmlns:wsa=""http://www.w3.org/2005/08/addressing"">{action}</wsa:Action>
     </soap:Header>
     <soap:Body>
         {body}
@@ -118,17 +163,10 @@ namespace wpfhikip.Protocols.Onvif
         /// </summary>
         public static string CreateSimpleSoapEnvelope(string body, string action = "")
         {
-            var actionHeader = !string.IsNullOrEmpty(action)
-                ? $@"<wsa:Action xmlns:wsa=""http://www.w3.org/2005/08/addressing"">{action}</wsa:Action>"
-                : "";
-
-            return $@"<?xml version=""1.0"" encoding=""UTF-8""?>
-<soap:Envelope xmlns:soap=""http://www.w3.org/2003/05/soap-envelope"" 
+            return $@"<?xml version=""1.0"" encoding=""utf-8""?>
+<soap:Envelope xmlns:soap=""http://schemas.xmlsoap.org/soap/"" 
                xmlns:tds=""http://www.onvif.org/ver10/device/wsdl""
                xmlns:tt=""http://www.onvif.org/ver10/schema"">
-    <soap:Header>
-        {actionHeader}
-    </soap:Header>
     <soap:Body>
         {body}
     </soap:Body>
@@ -144,11 +182,28 @@ namespace wpfhikip.Protocols.Onvif
 
             if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
             {
-                return CreateAuthenticatedSoapEnvelope(body, username, password, OnvifUrl.SoapActions.GetDeviceInformation);
+                return CreateAuthenticatedSoapEnvelope(body, username, password);
             }
             else
             {
-                return CreateSimpleSoapEnvelope(body, OnvifUrl.SoapActions.GetDeviceInformation);
+                return CreateSimpleSoapEnvelope(body);
+            }
+        }
+
+        /// <summary>
+        /// Creates GetSystemDateAndTime SOAP request (usually available without authentication)
+        /// </summary>
+        public static string CreateGetSystemDateAndTimeRequest(string username = null, string password = null)
+        {
+            var body = "<tds:GetSystemDateAndTime/>";
+
+            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+            {
+                return CreateAuthenticatedSoapEnvelope(body, username, password);
+            }
+            else
+            {
+                return CreateSimpleSoapEnvelope(body);
             }
         }
 
@@ -163,11 +218,11 @@ namespace wpfhikip.Protocols.Onvif
 
             if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
             {
-                return CreateAuthenticatedSoapEnvelope(body, username, password, OnvifUrl.SoapActions.GetCapabilities);
+                return CreateAuthenticatedSoapEnvelope(body, username, password);
             }
             else
             {
-                return CreateSimpleSoapEnvelope(body, OnvifUrl.SoapActions.GetCapabilities);
+                return CreateSimpleSoapEnvelope(body);
             }
         }
 
@@ -177,10 +232,8 @@ namespace wpfhikip.Protocols.Onvif
         public static string CreateGetNetworkInterfacesRequest(string username, string password)
         {
             var body = "<tds:GetNetworkInterfaces/>";
-            return CreateAuthenticatedSoapEnvelope(body, username, password, OnvifUrl.SoapActions.GetNetworkInterfaces);
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
         }
-
-        // Add these overloaded methods to OnvifSoapTemplates.cs after the existing methods:
 
         /// <summary>
         /// Creates SetNetworkInterfaces SOAP request using Camera object
@@ -204,7 +257,7 @@ namespace wpfhikip.Protocols.Onvif
         </tds:NetworkInterface>
     </tds:SetNetworkInterfaces>";
 
-            return CreateAuthenticatedSoapEnvelope(body, username, password, OnvifUrl.SoapActions.SetNetworkInterfaces);
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
         }
 
         /// <summary>
@@ -213,7 +266,7 @@ namespace wpfhikip.Protocols.Onvif
         public static string CreateGetNtpRequest(string username, string password)
         {
             var body = "<tds:GetNTP/>";
-            return CreateAuthenticatedSoapEnvelope(body, username, password, OnvifUrl.SoapActions.GetNTP);
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
         }
 
         /// <summary>
@@ -229,34 +282,7 @@ namespace wpfhikip.Protocols.Onvif
         </tds:NTPManual>
     </tds:SetNTP>";
 
-            return CreateAuthenticatedSoapEnvelope(body, username, password, OnvifUrl.SoapActions.SetNTP);
-        }
-        /// <summary>
-        /// Creates WS-Discovery Probe request for ONVIF device discovery
-        /// </summary>
-        public static string CreateProbeRequest()
-        {
-            var uuid = Guid.NewGuid().ToString();
-
-            return $@"<?xml version=""1.0"" encoding=""UTF-8""?>
-<soap:Envelope xmlns:soap=""http://www.w3.org/2003/05/soap-envelope""
-               xmlns:wsa=""http://www.w3.org/2005/08/addressing""
-               xmlns:tds=""http://www.onvif.org/ver10/device/wsdl""
-               xmlns:dn=""http://www.onvif.org/ver10/network/wsdl"">
-    <soap:Header>
-        <wsa:Action>http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe</wsa:Action>
-        <wsa:MessageID>urn:uuid:{uuid}</wsa:MessageID>
-        <wsa:ReplyTo>
-            <wsa:Address>http://www.w3.org/2005/08/addressing/anonymous</wsa:Address>
-        </wsa:ReplyTo>
-        <wsa:To>urn:schemas-xmlsoap-org:ws:2005:04:discovery</wsa:To>
-    </soap:Header>
-    <soap:Body>
-        <Probe xmlns=""http://schemas.xmlsoap.org/ws/2005/04/discovery"">
-            <d:Types xmlns:d=""http://schemas.xmlsoap.org/ws/2005/04/discovery"">dn:NetworkVideoTransmitter</d:Types>
-        </Probe>
-    </soap:Body>
-</soap:Envelope>";
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
         }
 
         /// <summary>
@@ -268,7 +294,6 @@ namespace wpfhikip.Protocols.Onvif
             try
             {
                 var doc = XDocument.Parse(soapResponse);
-                var ns = XNamespace.Get("http://www.onvif.org/ver10/schema");
 
                 var deviceInfo = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "GetDeviceInformationResponse");
                 if (deviceInfo != null)
@@ -353,7 +378,6 @@ namespace wpfhikip.Protocols.Onvif
                 return Convert.ToBase64String(hash);
             }
         }
-
 
         /// <summary>
         /// Checks if configuration has changed by comparing current and new values using Camera object

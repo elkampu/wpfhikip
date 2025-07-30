@@ -195,21 +195,21 @@ namespace wpfhikip.ViewModels
                 if (camera.Protocol != CameraProtocol.Auto)
                 {
                     camera.AddProtocolLog("System", "Protocol Selection",
-                        $"Specific protocol selected: {camera.Protocol}. Checking selected protocol first.");
+                        $"Specific protocol selected: {camera.Protocol}. Testing ONLY the selected protocol.");
 
                     protocolResult = await CheckSpecificProtocolAsync(camera, cancellationToken);
-                    if (protocolResult.IsCompatible)
-                    {
-                        SetFinalStatus(camera, protocolResult);
-                        return;
-                    }
 
-                    camera.AddProtocolLog("System", "Protocol Selection",
-                        $"Selected protocol {camera.Protocol} failed. Falling back to auto-detection.");
+                    // For specific protocol selection, don't fall back to auto-detection
+                    // Return the result regardless of success/failure
+                    SetFinalStatus(camera, protocolResult);
+                    return;
                 }
 
-                // Step 3: Proceed with full protocol detection
-                protocolResult = await ProtocolManager.CheckCompatibilityAsync(camera, cancellationToken);
+                // Step 3: Only use enhanced protocol detection for Auto mode
+                camera.AddProtocolLog("System", "Auto Protocol Detection",
+                    "Auto protocol selected. Testing all supported protocols to find the best match...");
+
+                protocolResult = await CheckAllProtocolsAsync(camera, cancellationToken);
                 SetFinalStatus(camera, protocolResult);
             }
             catch (OperationCanceledException)
@@ -223,19 +223,122 @@ namespace wpfhikip.ViewModels
             }
         }
 
+        /// <summary>
+        /// Enhanced protocol detection that tests all protocols and returns the best match (Auto mode only)
+        /// </summary>
+        private async Task<ProtocolCompatibilityResult> CheckAllProtocolsAsync(Camera camera, CancellationToken cancellationToken)
+        {
+            var supportedProtocols = ProtocolConnectionFactory.GetSupportedProtocols().ToList();
+
+            // Test all protocols concurrently for better performance
+            var tasks = supportedProtocols.Select(async protocol =>
+            {
+                try
+                {
+                    camera.AddProtocolLog(protocol.ToString(), "Auto Detection",
+                        $"Testing {protocol} protocol in auto-detection mode...");
+
+                    var result = await ProtocolManager.CheckSingleProtocolAsync(camera, protocol, cancellationToken);
+                    return (Protocol: protocol, Result: result);
+                }
+                catch (Exception ex)
+                {
+                    camera.AddProtocolLog(protocol.ToString(), "Auto Detection Error",
+                        $"Error testing {protocol}: {ex.Message}", ProtocolLogLevel.Warning);
+                    return (Protocol: protocol, Result: ProtocolCompatibilityResult.CreateFailure(ex.Message, protocol));
+                }
+            });
+
+            var allResults = await Task.WhenAll(tasks);
+
+            // Filter and prioritize results
+            var compatibleResults = allResults.Where(r => r.Result.IsCompatible).ToList();
+
+            if (compatibleResults.Count == 0)
+            {
+                camera.AddProtocolLog("System", "Auto Detection",
+                    "No compatible protocols found after testing all options.", ProtocolLogLevel.Error);
+                return ProtocolCompatibilityResult.CreateFailure("No compatible protocols found");
+            }
+
+            if (compatibleResults.Count == 1)
+            {
+                var singleResult = compatibleResults[0];
+                camera.AddProtocolLog("System", "Auto Detection",
+                    $"Single compatible protocol found: {singleResult.Protocol}", ProtocolLogLevel.Success);
+                return singleResult.Result;
+            }
+
+            // Multiple compatible protocols - choose the best one based on priority and features
+            var bestResult = SelectBestProtocolResult(camera, compatibleResults);
+            camera.AddProtocolLog("System", "Auto Detection",
+                $"Multiple protocols compatible. Selected: {bestResult.DetectedProtocol} " +
+                $"(from {compatibleResults.Count} options: {string.Join(", ", compatibleResults.Select(r => r.Protocol))})",
+                ProtocolLogLevel.Success);
+
+            return bestResult;
+        }
+
+        /// <summary>
+        /// Selects the best protocol result when multiple protocols are compatible (Auto mode)
+        /// </summary>
+        private ProtocolCompatibilityResult SelectBestProtocolResult(Camera camera,
+            List<(CameraProtocol Protocol, ProtocolCompatibilityResult Result)> compatibleResults)
+        {
+            // Priority order: prefer more specific protocols over generic ones
+            var priorityOrder = new[]
+            {
+                CameraProtocol.Hikvision,  // Specific vendor protocol (best features)
+                CameraProtocol.Dahua,      // Specific vendor protocol  
+                CameraProtocol.Axis,       // Specific vendor protocol
+                CameraProtocol.Onvif       // Generic standard protocol (fallback)
+            };
+
+            foreach (var preferredProtocol in priorityOrder)
+            {
+                var match = compatibleResults.FirstOrDefault(r => r.Protocol == preferredProtocol);
+                if (match.Result != null)
+                {
+                    camera.AddProtocolLog("System", "Protocol Selection",
+                        $"Selected {preferredProtocol} based on priority ranking.", ProtocolLogLevel.Info);
+                    return match.Result;
+                }
+            }
+
+            // Fallback to first available (shouldn't reach here normally)
+            var fallback = compatibleResults[0];
+            camera.AddProtocolLog("System", "Protocol Selection",
+                $"Selected {fallback.Protocol} as fallback option.", ProtocolLogLevel.Info);
+            return fallback.Result;
+        }
+
         private async Task<ProtocolCompatibilityResult> CheckSpecificProtocolAsync(Camera camera, CancellationToken cancellationToken)
         {
             try
             {
                 camera.AddProtocolLog(camera.Protocol.ToString(), "Specific Protocol Check",
-                    $"Testing selected protocol: {camera.Protocol}");
+                    $"Testing ONLY the selected protocol: {camera.Protocol}");
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    camera.Status = $"Checking {camera.Protocol} protocol...";
+                    camera.Status = $"Checking {camera.Protocol} protocol only...";
                 });
 
-                return await ProtocolManager.CheckSingleProtocolAsync(camera, camera.Protocol, cancellationToken);
+                var result = await ProtocolManager.CheckSingleProtocolAsync(camera, camera.Protocol, cancellationToken);
+
+                // Enhanced logging for specific protocol results
+                if (result.IsCompatible)
+                {
+                    camera.AddProtocolLog(camera.Protocol.ToString(), "Specific Protocol Result",
+                        $"✓ {camera.Protocol} protocol is compatible", ProtocolLogLevel.Success);
+                }
+                else
+                {
+                    camera.AddProtocolLog(camera.Protocol.ToString(), "Specific Protocol Result",
+                        $"✗ {camera.Protocol} protocol is NOT compatible: {result.Message}", ProtocolLogLevel.Error);
+                }
+
+                return result;
             }
             catch (Exception ex)
             {
@@ -323,8 +426,10 @@ namespace wpfhikip.ViewModels
         private async Task InitializeCameraCheck(Camera camera, CancellationToken cancellationToken)
         {
             camera.ClearProtocolLogs();
+
+            var checkType = camera.Protocol == CameraProtocol.Auto ? "Auto-detection" : $"Specific protocol ({camera.Protocol})";
             camera.AddProtocolLog("System", "Starting Compatibility Check",
-                $"Beginning enhanced compatibility check for {camera.CurrentIP}:{camera.EffectivePort}");
+                $"Beginning {checkType} compatibility check for {camera.CurrentIP}:{camera.EffectivePort}");
 
             Application.Current.Dispatcher.Invoke(() =>
             {
@@ -367,11 +472,13 @@ namespace wpfhikip.ViewModels
             if (!result.IsCompatible)
             {
                 camera.AddProtocolLog("System", "Check Complete",
-                    "No compatible protocols found", ProtocolLogLevel.Error);
+                    "Protocol compatibility check failed", ProtocolLogLevel.Error);
 
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    camera.Status = "No compatible protocol found";
+                    camera.Status = result.DetectedProtocol == CameraProtocol.Auto
+                        ? "No compatible protocol found"
+                        : $"{result.DetectedProtocol} not compatible";
                     camera.CellColor = Brushes.LightCoral;
                     camera.IsCompatible = false;
                     camera.RequiresAuthentication = false;
@@ -381,7 +488,8 @@ namespace wpfhikip.ViewModels
             else
             {
                 camera.AddProtocolLog("System", "Check Complete",
-                    "Compatibility check completed successfully", ProtocolLogLevel.Success);
+                    $"Protocol compatibility check completed successfully - {result.DetectedProtocol} is compatible",
+                    ProtocolLogLevel.Success);
 
                 UpdateCameraForProtocol(camera, result);
             }

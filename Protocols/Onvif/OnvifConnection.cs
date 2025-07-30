@@ -9,7 +9,7 @@ namespace wpfhikip.Protocols.Onvif
 {
     public sealed class OnvifConnection : IProtocolConnection
     {
-        private const int HttpTimeoutSeconds = 5;
+        private const int HttpTimeoutSeconds = 15;
 
         private HttpClient? _httpClient;
         private bool _disposed;
@@ -48,33 +48,53 @@ namespace wpfhikip.Protocols.Onvif
                     return ProtocolCompatibilityResult.CreateFailure("ONVIF device service not found");
                 }
 
+                // Try without authentication first (many ONVIF devices allow GetDeviceInformation without auth)
                 var deviceInfoRequest = OnvifSoapTemplates.CreateGetDeviceInformationRequest();
-                var response = await SendSoapRequestAsync(_deviceServiceUrl!, deviceInfoRequest);
+                var response = await SendSoapRequestAsync(_deviceServiceUrl!, deviceInfoRequest, OnvifUrl.SoapActions.GetDeviceInformation);
 
-                if (response.Success)
+                if (response.Success && OnvifSoapTemplates.ValidateOnvifResponse(response.Content))
                 {
-                    if (OnvifSoapTemplates.ValidateOnvifResponse(response.Content))
+                    return ProtocolCompatibilityResult.CreateSuccess(
+                        CameraProtocol.Onvif,
+                        requiresAuth: false,
+                        isAuthenticated: true);
+                }
+
+                // Check if authentication is required
+                if (response.StatusCode == HttpStatusCode.Unauthorized || OnvifSoapTemplates.IsSoapFault(response.Content))
+                {
+                    if (!string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password))
+                    {
+                        var authResult = await TestAuthenticationAsync();
+                        return ProtocolCompatibilityResult.CreateSuccess(
+                            CameraProtocol.Onvif,
+                            requiresAuth: true,
+                            isAuthenticated: authResult.Success,
+                            authMessage: authResult.Message);
+                    }
+                    else
                     {
                         return ProtocolCompatibilityResult.CreateSuccess(
                             CameraProtocol.Onvif,
-                            requiresAuth: false,
-                            isAuthenticated: true);
+                            requiresAuth: true,
+                            isAuthenticated: false,
+                            authMessage: "Credentials required for authentication");
                     }
-
-                    return ProtocolCompatibilityResult.CreateFailure("Device responds but is not ONVIF compatible");
                 }
 
-                if (response.StatusCode == HttpStatusCode.Unauthorized || OnvifSoapTemplates.IsSoapFault(response.Content))
+                // Try GetSystemDateAndTime as a fallback (usually always available without auth)
+                var dateTimeRequest = OnvifSoapTemplates.CreateGetSystemDateAndTimeRequest();
+                var dateTimeResponse = await SendSoapRequestAsync(_deviceServiceUrl!, dateTimeRequest, OnvifUrl.SoapActions.GetSystemDateAndTime);
+
+                if (dateTimeResponse.Success && OnvifSoapTemplates.ValidateOnvifResponse(dateTimeResponse.Content))
                 {
-                    var authResult = await TestAuthenticationAsync();
                     return ProtocolCompatibilityResult.CreateSuccess(
                         CameraProtocol.Onvif,
-                        requiresAuth: true,
-                        isAuthenticated: authResult.IsAuthenticated,
-                        authMessage: authResult.Message);
+                        requiresAuth: false,
+                        isAuthenticated: true);
                 }
 
-                return ProtocolCompatibilityResult.CreateFailure($"Unexpected response: {response.StatusCode}");
+                return ProtocolCompatibilityResult.CreateFailure($"Device responds but is not ONVIF compatible. Status: {response.StatusCode}");
             }
             catch (HttpRequestException ex)
             {
@@ -108,16 +128,17 @@ namespace wpfhikip.Protocols.Onvif
                 }
 
                 var deviceInfoRequest = OnvifSoapTemplates.CreateGetDeviceInformationRequest(Username, Password);
-                var response = await SendSoapRequestAsync(_deviceServiceUrl!, deviceInfoRequest);
+                var response = await SendSoapRequestAsync(_deviceServiceUrl!, deviceInfoRequest, OnvifUrl.SoapActions.GetDeviceInformation);
 
                 if (response.Success && OnvifSoapTemplates.ValidateOnvifResponse(response.Content))
                 {
-                    return AuthenticationResult.CreateSuccess();
+                    return AuthenticationResult.CreateSuccess("Authentication successful");
                 }
 
                 if (OnvifSoapTemplates.IsSoapFault(response.Content))
                 {
-                    return AuthenticationResult.CreateFailure("Authentication failed - invalid credentials");
+                    var faultString = OnvifSoapTemplates.ExtractSoapFaultString(response.Content);
+                    return AuthenticationResult.CreateFailure($"Authentication failed: {faultString}");
                 }
 
                 return AuthenticationResult.CreateError($"Unexpected response during authentication: {response.StatusCode}");
@@ -145,7 +166,7 @@ namespace wpfhikip.Protocols.Onvif
 
                 // Get current network interfaces
                 var getNetworkRequest = OnvifSoapTemplates.CreateGetNetworkInterfacesRequest(Username, Password);
-                var getResponse = await SendSoapRequestAsync(_deviceServiceUrl!, getNetworkRequest);
+                var getResponse = await SendSoapRequestAsync(_deviceServiceUrl!, getNetworkRequest, OnvifUrl.SoapActions.GetNetworkInterfaces);
 
                 if (!getResponse.Success) return false;
 
@@ -160,7 +181,7 @@ namespace wpfhikip.Protocols.Onvif
                 };
 
                 var setNetworkRequest = OnvifSoapTemplates.CreateSetNetworkInterfacesRequest(tempCamera, interfaceToken, Username, Password);
-                var setResponse = await SendSoapRequestAsync(_deviceServiceUrl!, setNetworkRequest);
+                var setResponse = await SendSoapRequestAsync(_deviceServiceUrl!, setNetworkRequest, OnvifUrl.SoapActions.SetNetworkInterfaces);
 
                 return setResponse.Success && !OnvifSoapTemplates.IsSoapFault(setResponse.Content);
             }
@@ -192,7 +213,7 @@ namespace wpfhikip.Protocols.Onvif
                 };
 
                 var setNtpRequest = OnvifSoapTemplates.CreateSetNtpRequest(tempCamera, Username, Password);
-                var response = await SendSoapRequestAsync(_deviceServiceUrl!, setNtpRequest);
+                var response = await SendSoapRequestAsync(_deviceServiceUrl!, setNtpRequest, OnvifUrl.SoapActions.SetNTP);
 
                 return response.Success && !OnvifSoapTemplates.IsSoapFault(response.Content);
             }
@@ -204,36 +225,56 @@ namespace wpfhikip.Protocols.Onvif
 
         private async Task<bool> DiscoverDeviceServiceAsync()
         {
-            // Use only the user-defined port instead of scanning all common ports
-            var urls = OnvifUrl.UrlBuilders.GetPossibleDeviceServiceUrls(IpAddress, Port);
+            // Try common ONVIF ports
+            var portsToTry = Port != 80 ? new[] { Port, 80, 8080, 8000, 554, 8554 } : new[] { 80, 8080, 8000 };
 
-            foreach (var url in urls)
+            foreach (var port in portsToTry)
             {
-                try
-                {
-                    var testRequest = OnvifSoapTemplates.CreateGetDeviceInformationRequest();
-                    var response = await SendSoapRequestAsync(url, testRequest).ConfigureAwait(false);
+                var urls = OnvifUrl.UrlBuilders.GetPossibleDeviceServiceUrls(IpAddress, port);
 
-                    if (response.Success || OnvifSoapTemplates.IsSoapFault(response.Content))
-                    {
-                        _deviceServiceUrl = url;
-                        return true;
-                    }
-                }
-                catch
+                foreach (var url in urls)
                 {
-                    // Continue trying other URLs on the same port
+                    try
+                    {
+                        // ONVIF requires POST requests - try with GetSystemDateAndTime (most basic ONVIF call)
+                        var testRequest = OnvifSoapTemplates.CreateGetSystemDateAndTimeRequest();
+                        var soapResponse = await SendSoapRequestAsync(url, testRequest, OnvifUrl.SoapActions.GetSystemDateAndTime).ConfigureAwait(false);
+
+                        // Consider it found if we get any ONVIF-like response
+                        if (soapResponse.Success ||
+                            soapResponse.StatusCode == HttpStatusCode.Unauthorized ||
+                            OnvifSoapTemplates.IsSoapFault(soapResponse.Content) ||
+                            OnvifSoapTemplates.ValidateOnvifResponse(soapResponse.Content))
+                        {
+                            _deviceServiceUrl = url;
+                            return true;
+                        }
+                    }
+                    catch
+                    {
+                        // Continue trying other URLs
+                    }
                 }
             }
 
             return false;
         }
 
-        private async Task<(bool Success, string Content, HttpStatusCode StatusCode)> SendSoapRequestAsync(string url, string soapRequest)
+        private async Task<(bool Success, string Content, HttpStatusCode StatusCode)> SendSoapRequestAsync(string url, string soapRequest, string soapAction = "")
         {
             try
             {
-                var content = new StringContent(soapRequest, Encoding.UTF8, OnvifContentTypes.Soap);
+                // Use proper ONVIF content type
+                var content = new StringContent(soapRequest, Encoding.UTF8, "text/xml");
+                content.Headers.Remove("Content-Type");
+                content.Headers.Add("Content-Type", "text/xml; charset=utf-8");
+
+                // Add required SOAP action header
+                if (!string.IsNullOrEmpty(soapAction))
+                {
+                    content.Headers.Add("SOAPAction", $"\"{soapAction}\"");
+                }
+
                 var response = await _httpClient!.PostAsync(url, content).ConfigureAwait(false);
                 var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
@@ -249,11 +290,18 @@ namespace wpfhikip.Protocols.Onvif
         {
             if (_httpClient != null) return;
 
-            _httpClient = new HttpClient(new HttpClientHandler())
+            var handler = new HttpClientHandler()
+            {
+                ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
+            };
+
+            _httpClient = new HttpClient(handler)
             {
                 Timeout = TimeSpan.FromSeconds(HttpTimeoutSeconds)
             };
-            _httpClient.DefaultRequestHeaders.Add("User-Agent", "OnvifCompatibilityChecker/1.0");
+
+            _httpClient.DefaultRequestHeaders.Add("User-Agent", "ONVIFClient/1.0");
+            _httpClient.DefaultRequestHeaders.Add("Connection", "keep-alive");
         }
 
         public void Dispose()

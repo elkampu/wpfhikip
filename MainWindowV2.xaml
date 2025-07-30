@@ -58,20 +58,20 @@
                     Width="200"
                     Background="#FFFFFF"
                     Margin="10">
-            <Button Content="Sites Management"
-                    Style="{StaticResource ModernMenuButtonStyle}" />
+            <!--<Button Content="Sites Management"
+                    Style="{StaticResource ModernMenuButtonStyle}" />-->
             <Button Content="Network Scanner"
                     Style="{StaticResource ModernMenuButtonStyle}"
                     Click="NetworkScannerButton_Click" />
             <Button Content="Batch Configuration"
                     Style="{StaticResource ModernMenuButtonStyle}"
                     Click="BatchConfigurationButton_Click" />
-            <Button Content="Backup Assistant"
+            <!--<Button Content="Backup Assistant"
                     Style="{StaticResource ModernMenuButtonStyle}" />
             <Button Content="Maintenance Tools"
                     Style="{StaticResource ModernMenuButtonStyle}" />
             <Button Content="Data Import"
-                    Style="{StaticResource ModernMenuButtonStyle}" />
+                    Style="{StaticResource ModernMenuButtonStyle}" />-->
         </StackPanel>
     </Grid>
 </Window>

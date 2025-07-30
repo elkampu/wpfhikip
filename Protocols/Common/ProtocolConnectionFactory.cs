@@ -38,19 +38,19 @@ namespace wpfhikip.Protocols.Common
         }
 
         /// <summary>
-        /// Gets all supported protocols
+        /// Gets all supported protocols (delegates to ProtocolFactoryRegistry)
         /// </summary>
         public static IEnumerable<CameraProtocol> GetSupportedProtocols()
         {
-            return ConnectionFactories.Keys;
+            return ProtocolFactoryRegistry.GetSupportedProtocols();
         }
 
         /// <summary>
-        /// Checks if a protocol is supported
+        /// Checks if a protocol is supported (delegates to ProtocolFactoryRegistry)
         /// </summary>
         public static bool IsProtocolSupported(CameraProtocol protocol)
         {
-            return ConnectionFactories.ContainsKey(protocol);
+            return ProtocolFactoryRegistry.IsProtocolSupported(protocol);
         }
     }
 }

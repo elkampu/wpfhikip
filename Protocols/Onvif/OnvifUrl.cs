@@ -90,6 +90,7 @@ namespace wpfhikip.Protocols.Onvif
             // Device Service Actions
             public const string GetDeviceInformation = "http://www.onvif.org/ver10/device/wsdl/GetDeviceInformation";
             public const string GetCapabilities = "http://www.onvif.org/ver10/device/wsdl/GetCapabilities";
+
             public const string GetNetworkInterfaces = "http://www.onvif.org/ver10/device/wsdl/GetNetworkInterfaces";
             public const string SetNetworkInterfaces = "http://www.onvif.org/ver10/device/wsdl/SetNetworkInterfaces";
             public const string GetNTP = "http://www.onvif.org/ver10/device/wsdl/GetNTP";

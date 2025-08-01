@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Media;
 
@@ -13,10 +14,7 @@ namespace wpfhikip.Models
         private string? _serialNumber;
         private string? _macAddress;
         private string? _status;
-        private string? _onlineStatus;
-        private Brush? _rowColor;
         private Brush? _cellColor;
-        private FontWeight _cellFontWeight;
         private bool _isCompleted;
         private CameraProtocol _protocol;
         private bool _isCompatible;
@@ -128,7 +126,7 @@ namespace wpfhikip.Models
             : _status.Length > 10 ? string.Concat(_status.AsSpan(0, 7), "...") : _status;
 
 
-
+        [JsonIgnore]
         public Brush? CellColor
         {
             get => _cellColor;
@@ -148,6 +146,7 @@ namespace wpfhikip.Models
         public CameraVideoStream VideoStream { get; set; } = new();
 
         // Protocol logs
+        [JsonIgnore]
         public ConcurrentQueue<ProtocolLogEntry> ProtocolLogs => _protocolLogs;
 
         // Helper properties with optimized implementations

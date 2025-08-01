@@ -43,10 +43,6 @@
                                FontSize="24"
                                FontWeight="Bold"
                                Foreground="{StaticResource SEC_DarkGrey}" />
-                    <TextBlock Text="Discover devices on your network using multiple protocols"
-                               FontSize="14"
-                               Foreground="{StaticResource SEC_MidGrey}"
-                               Margin="0,4,0,0" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1"

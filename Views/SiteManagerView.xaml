@@ -1,0 +1,604 @@
+﻿<Window x:Class="wpfhikip.Views.SiteManagerView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:wpfhikip.Views"
+        xmlns:controls="clr-namespace:wpfhikip.Controls"
+        xmlns:viewModel="clr-namespace:wpfhikip.ViewModels"
+        xmlns:converters="clr-namespace:wpfhikip.Converters"
+        mc:Ignorable="d"
+        Title="Site Manager"
+        Height="1000"
+        Width="1600"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.DataContext>
+        <viewModel:SiteManagerViewModel />
+    </Window.DataContext>
+
+    <Window.Resources>
+        <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
+        <converters:EnumToStringConverter x:Key="EnumToStringConverter" />
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+        <!-- Dropdown Menu Button Style -->
+        <Style x:Key="DropdownMenuButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Setter Property="Content"
+                    Value="⚙️ Actions ▼" />
+            <Setter Property="Width"
+                    Value="90" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="#f8fafc">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0"
+                Background="{StaticResource SEC_White}"
+                BorderBrush="{StaticResource SEC_LightGrey}"
+                BorderThickness="0,0,0,1">
+            <Grid Margin="24,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Site Manager"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource SEC_DarkGrey}" />
+                    <TextBlock Text="Manage clients, sites, and their network devices"
+                               FontSize="14"
+                               Foreground="{StaticResource SEC_MidGrey}"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal">
+                    <Button Content="💾 Save Data"
+                            Command="{Binding SaveDataCommand}"
+                            Style="{StaticResource PrimaryButtonStyle}" />
+                    <Button Content="🔄 Refresh"
+                            Command="{Binding RefreshDataCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1"
+              Margin="24,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Clients Panel -->
+            <Border Grid.Column="0"
+                    Style="{StaticResource ModernCardStyle}"
+                    Margin="0,0,8,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Clients Header -->
+                    <TextBlock Grid.Row="0"
+                               Text="Clients"
+                               Style="{StaticResource SectionTitleStyle}"
+                               Margin="0,0,0,12" />
+
+                    <!-- Client Search -->
+                    <TextBox Grid.Row="1"
+                             Text="{Binding ClientSearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource ModernTextBoxStyle}"
+                             Margin="0,0,0,12">
+                        <TextBox.Tag>
+                            <TextBlock Text="🔍 Search clients..."
+                                       Foreground="{StaticResource SEC_MidGrey}"
+                                       IsHitTestVisible="False"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0" />
+                        </TextBox.Tag>
+                    </TextBox>
+
+                    <!-- Clients List -->
+                    <ListBox Grid.Row="2"
+                             ItemsSource="{Binding Clients}"
+                             SelectedItem="{Binding SelectedClient}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="White"
+                                        BorderBrush="{StaticResource SEC_LightGrey}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Margin="0,2"
+                                        Padding="12,8">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="✏️ Edit Client"
+                                                      Command="{Binding Path=DataContext.EditClientCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                      CommandParameter="{Binding}" />
+                                            <MenuItem Header="🗑️ Delete Client"
+                                                      Command="{Binding Path=DataContext.DeleteClientCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                      CommandParameter="{Binding}" />
+                                            <Separator />
+                                            <MenuItem Header="📤 Export Client"
+                                                      Command="{Binding Path=DataContext.ExportClientCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                      CommandParameter="{Binding}" />
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0"
+                                                   Text="{Binding Name}"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="14"
+                                                   Foreground="{StaticResource SEC_DarkGrey}" />
+
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding ContactPerson}"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource SEC_MidGrey}"
+                                                   Margin="0,2,0,0" />
+
+                                        <TextBlock Grid.Row="2"
+                                                   FontSize="11"
+                                                   Foreground="{StaticResource SEC_MidGrey}"
+                                                   Margin="0,4,0,0">
+                                            <Run Text="{Binding SiteCount, Mode=OneWay}" />
+                                            <Run Text="sites," />
+                                            <Run Text="{Binding TotalDeviceCount, Mode=OneWay}" />
+                                            <Run Text="devices" />
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- Client Actions -->
+                    <StackPanel Grid.Row="3"
+                                Orientation="Horizontal"
+                                Margin="0,12,0,0">
+                        <Button Content="➕ Add"
+                                Command="{Binding AddClientCommand}"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Width="100" />
+
+                        <!-- Client Actions Dropdown -->
+                        <Button x:Name="ClientActionsButton"
+                                Style="{StaticResource DropdownMenuButtonStyle}"
+                                Click="ClientActionsButton_Click"
+                                IsEnabled="{Binding IsClientSelected}"
+                                Width="120">
+                            <Button.ContextMenu>
+                                <ContextMenu x:Name="ClientActionsMenu">
+                                    <MenuItem Header="✏️ Edit Client"
+                                              Command="{Binding EditClientCommand}" />
+                                    <MenuItem Header="🗑️ Delete Client"
+                                              Command="{Binding DeleteClientCommand}" />
+                                    <Separator />
+                                    <MenuItem Header="📤 Export Client"
+                                              Command="{Binding ExportClientCommand}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Sites Panel -->
+            <Border Grid.Column="1"
+                    Style="{StaticResource ModernCardStyle}"
+                    Margin="8,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Sites Header -->
+                    <TextBlock Grid.Row="0"
+                               Text="Sites"
+                               Style="{StaticResource SectionTitleStyle}"
+                               Margin="0,0,0,12" />
+
+                    <!-- Site Search -->
+                    <TextBox Grid.Row="1"
+                             Text="{Binding SiteSearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource ModernTextBoxStyle}"
+                             Margin="0,0,0,12"
+                             IsEnabled="{Binding IsClientSelected}">
+                        <TextBox.Tag>
+                            <TextBlock Text="🔍 Search sites..."
+                                       Foreground="{StaticResource SEC_MidGrey}"
+                                       IsHitTestVisible="False"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0" />
+                        </TextBox.Tag>
+                    </TextBox>
+
+                    <!-- Sites List -->
+                    <ListBox Grid.Row="2"
+                             ItemsSource="{Binding Sites}"
+                             SelectedItem="{Binding SelectedSite}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             IsEnabled="{Binding IsClientSelected}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="White"
+                                        BorderBrush="{StaticResource SEC_LightGrey}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Margin="0,2"
+                                        Padding="12,8">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="✏️ Edit Site"
+                                                      Command="{Binding Path=DataContext.EditSiteCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                      CommandParameter="{Binding}" />
+                                            <MenuItem Header="🗑️ Delete Site"
+                                                      Command="{Binding Path=DataContext.DeleteSiteCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                      CommandParameter="{Binding}" />
+                                            <Separator />
+                                            <MenuItem Header="📤 Export Site"
+                                                      Command="{Binding Path=DataContext.ExportSiteCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                      CommandParameter="{Binding}" />
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0"
+                                                   Text="{Binding Name}"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="14"
+                                                   Foreground="{StaticResource SEC_DarkGrey}" />
+
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding Location}"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource SEC_MidGrey}"
+                                                   Margin="0,2,0,0" />
+
+                                        <TextBlock Grid.Row="2"
+                                                   Text="{Binding NetworkRange}"
+                                                   FontSize="11"
+                                                   Foreground="{StaticResource SEC_MidGrey}"
+                                                   Margin="0,2,0,0" />
+
+                                        <TextBlock Grid.Row="3"
+                                                   FontSize="11"
+                                                   Foreground="{StaticResource SEC_MidGrey}"
+                                                   Margin="0,4,0,0">
+                                            <Run Text="{Binding DeviceCount, Mode=OneWay}" />
+                                            <Run Text="devices" />
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- Site Actions -->
+                    <StackPanel Grid.Row="3"
+                                Orientation="Horizontal"
+                                Margin="0,12,0,0">
+                        <Button Content="➕ Add"
+                                Command="{Binding AddSiteCommand}"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Width="100" />
+
+                        <!-- Site Actions Dropdown -->
+                        <Button x:Name="SiteActionsButton"
+                                Style="{StaticResource DropdownMenuButtonStyle}"
+                                Click="SiteActionsButton_Click"
+                                IsEnabled="{Binding IsSiteSelected}"
+                                Width="120">
+                            <Button.ContextMenu>
+                                <ContextMenu x:Name="SiteActionsMenu">
+                                    <MenuItem Header="✏️ Edit Site"
+                                              Command="{Binding EditSiteCommand}" />
+                                    <MenuItem Header="🗑️ Delete Site"
+                                              Command="{Binding DeleteSiteCommand}" />
+                                    <Separator />
+                                    <MenuItem Header="📤 Export Site"
+                                              Command="{Binding ExportSiteCommand}" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Devices Panel -->
+            <Border Grid.Column="2"
+                    Style="{StaticResource ModernCardStyle}"
+                    Margin="8,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Devices Header -->
+                    <Grid Grid.Row="0"
+                          Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="Site Devices"
+                                   Style="{StaticResource SectionTitleStyle}"
+                                   Margin="0" />
+
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal">
+                            <Button Content="➕ Add Device"
+                                    Command="{Binding AddDeviceCommand}"
+                                    Style="{StaticResource PrimaryButtonStyle}" />
+                            <Button Content="🗑️ Delete"
+                                    Command="{Binding DeleteSelectedDevicesCommand}"
+                                    Style="{StaticResource DangerButtonStyle}" />
+                            <Button Content="☑️ Select All"
+                                    Command="{Binding SelectAllDevicesCommand}"
+                                    Style="{StaticResource SecondaryButtonStyle}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Devices DataGrid -->
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto">
+                        <DataGrid x:Name="devicesDataGrid"
+                                  Style="{StaticResource ModernDataGridStyle}"
+                                  ItemsSource="{Binding SiteDevices, Mode=OneWay}"
+                                  IsEnabled="{Binding IsSiteSelected}">
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow">
+                                    <Setter Property="Background"
+                                            Value="{Binding RowColor}" />
+                                </Style>
+                            </DataGrid.RowStyle>
+                            <DataGrid.Columns>
+                                <!-- Select Column -->
+                                <DataGridTemplateColumn Header="☑"
+                                                        Width="35"
+                                                        MinWidth="35"
+                                                        MaxWidth="35">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Protocol Column -->
+                                <DataGridTemplateColumn Header="Protocol"
+                                                        Width="80"
+                                                        MinWidth="80"
+                                                        MaxWidth="80">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Protocol, Converter={StaticResource EnumToStringConverter}}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="12" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                    <DataGridTemplateColumn.CellEditingTemplate>
+                                        <DataTemplate>
+                                            <ComboBox SelectedValue="{Binding Protocol, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                      ItemsSource="{Binding Path=DataContext.ProtocolOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                      FontSize="12"
+                                                      HorizontalContentAlignment="Center">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding Converter={StaticResource EnumToStringConverter}}" />
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellEditingTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Current IP Column -->
+                                <DataGridTemplateColumn Header="Current IP"
+                                                        Width="110"
+                                                        MinWidth="110"
+                                                        MaxWidth="110">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding CurrentIP}"
+                                                       FontWeight="{Binding CellFontWeight}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="12" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                    <DataGridTemplateColumn.CellEditingTemplate>
+                                        <DataTemplate>
+                                            <controls:IpAddressControl IpAddress="{Binding CurrentIP, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellEditingTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Port Column -->
+                                <DataGridTextColumn Header="Port"
+                                                    Width="50"
+                                                    MinWidth="50"
+                                                    MaxWidth="50"
+                                                    Binding="{Binding Port}">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="HorizontalAlignment"
+                                                    Value="Center" />
+                                            <Setter Property="VerticalAlignment"
+                                                    Value="Center" />
+                                            <Setter Property="FontSize"
+                                                    Value="12" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <!-- Username Column -->
+                                <DataGridTextColumn Header="User"
+                                                    Width="80"
+                                                    MinWidth="80"
+                                                    MaxWidth="80"
+                                                    Binding="{Binding Username}">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="HorizontalAlignment"
+                                                    Value="Center" />
+                                            <Setter Property="VerticalAlignment"
+                                                    Value="Center" />
+                                            <Setter Property="FontSize"
+                                                    Value="12" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <!-- Password Column -->
+                                <DataGridTextColumn Header="Pass"
+                                                    Width="80"
+                                                    MinWidth="80"
+                                                    MaxWidth="80"
+                                                    Binding="{Binding Password}">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="HorizontalAlignment"
+                                                    Value="Center" />
+                                            <Setter Property="VerticalAlignment"
+                                                    Value="Center" />
+                                            <Setter Property="FontSize"
+                                                    Value="12" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <!-- Manufacturer Column -->
+                                <DataGridTextColumn Header="Manufacturer"
+                                                    Width="100"
+                                                    MinWidth="100"
+                                                    MaxWidth="100"
+                                                    Binding="{Binding Manufacturer}">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="HorizontalAlignment"
+                                                    Value="Center" />
+                                            <Setter Property="VerticalAlignment"
+                                                    Value="Center" />
+                                            <Setter Property="FontSize"
+                                                    Value="12" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <!-- Model Column -->
+                                <DataGridTextColumn Header="Model"
+                                                    Width="120"
+                                                    MinWidth="120"
+                                                    MaxWidth="120"
+                                                    Binding="{Binding Model}">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="HorizontalAlignment"
+                                                    Value="Center" />
+                                            <Setter Property="VerticalAlignment"
+                                                    Value="Center" />
+                                            <Setter Property="FontSize"
+                                                    Value="12" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <!-- Status Column -->
+                                <DataGridTemplateColumn Header="Status"
+                                                        Width="120"
+                                                        MinWidth="120"
+                                                        MaxWidth="120"
+                                                        IsReadOnly="True">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding ShortStatus}"
+                                                    Style="{StaticResource StatusButtonStyle}"
+                                                    HorizontalAlignment="Stretch"
+                                                    VerticalAlignment="Stretch" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Action Bar -->
+        <Border Grid.Row="2"
+                Background="{StaticResource SEC_White}"
+                BorderBrush="{StaticResource SEC_LightGrey}"
+                BorderThickness="0,1,0,0">
+            <Grid Margin="24,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Left group: Compatibility Check -->
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Left">
+                    <Button Content="🔍 Check Compatibility"
+                            Command="{Binding CheckCompatibilityCommand}"
+                            Visibility="{Binding IsCheckingCompatibility, Converter={StaticResource InverseBooleanToVisibilityConverter}, ConverterParameter=Invert}"
+                            Style="{StaticResource PrimaryButtonStyle}" />
+
+                    <Button Content="⏹️ Cancel Check"
+                            Command="{Binding CancelCompatibilityCommand}"
+                            Visibility="{Binding IsCheckingCompatibility, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            Style="{StaticResource DangerButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

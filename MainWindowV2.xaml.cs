@@ -13,6 +13,7 @@ namespace wpfhikip
     {
         private NetworkDiscoveryView? _networkDiscoveryWindow;
         private NetConfView? _netConfWindow;
+        private SiteManagerView? _siteManagerWindow;
 
         public MainWindowV2()
         {
@@ -66,12 +67,36 @@ namespace wpfhikip
                     "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+        /// <summary>
+        /// Opens the Site Manager window (single instance)
+        /// </summary>
+        private void SiteManagerButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (_siteManagerWindow == null || !_siteManagerWindow.IsLoaded)
+                {
+                    _siteManagerWindow = new SiteManagerView();
+                    _siteManagerWindow.Closed += (s, args) => _siteManagerWindow = null;
+                }
+
+                _siteManagerWindow.Show();
+                _siteManagerWindow.Activate();
+                _siteManagerWindow.Focus();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening Site Manager: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
 
         protected override void OnClosed(EventArgs e)
         {
             // Clean up any open windows when main window closes
             _networkDiscoveryWindow?.Close();
             _netConfWindow?.Close();
+            _siteManagerWindow?.Close();
             base.OnClosed(e);
         }
     }

@@ -25,6 +25,91 @@
         </Setter>
     </Style>
 
+    <!-- Modern TextBox Style -->
+    <Style x:Key="ModernTextBoxStyle"
+           TargetType="TextBox">
+        <Setter Property="Background"
+                Value="{StaticResource SEC_White}" />
+        <Setter Property="BorderBrush"
+                Value="{StaticResource SEC_LightGrey}" />
+        <Setter Property="BorderThickness"
+                Value="1" />
+        <Setter Property="Padding"
+                Value="12,8" />
+        <Setter Property="Margin"
+                Value="2" />
+        <Setter Property="FontSize"
+                Value="14" />
+        <Setter Property="VerticalContentAlignment"
+                Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="4">
+                        <Grid>
+                            <!-- Placeholder Text -->
+                            <ContentPresenter x:Name="PlaceholderText"
+                                              Content="{TemplateBinding Tag}"
+                                              Visibility="Collapsed"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              HorizontalAlignment="Left"
+                                              Margin="{TemplateBinding Padding}" />
+
+                            <!-- Actual TextBox -->
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Focusable="false"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Hidden"
+                                          Margin="{TemplateBinding Padding}" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <!-- Show placeholder when text is empty and not focused -->
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="Text"
+                                           Value="" />
+                                <Condition Property="IsFocused"
+                                           Value="False" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PlaceholderText"
+                                    Property="Visibility"
+                                    Value="Visible" />
+                        </MultiTrigger>
+
+                        <!-- Focus state -->
+                        <Trigger Property="IsFocused"
+                                 Value="True">
+                            <Setter Property="BorderBrush"
+                                    Value="{StaticResource SEC_MidBlue}" />
+                            <Setter Property="BorderThickness"
+                                    Value="2" />
+                        </Trigger>
+
+                        <!-- Mouse over state -->
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter Property="BorderBrush"
+                                    Value="{StaticResource SEC_DarkGrey}" />
+                        </Trigger>
+
+                        <!-- Disabled state -->
+                        <Trigger Property="IsEnabled"
+                                 Value="False">
+                            <Setter Property="Background"
+                                    Value="{StaticResource SEC_LightGrey}" />
+                            <Setter Property="Foreground"
+                                    Value="{StaticResource SEC_MidGrey}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Modern Button Style -->
     <Style x:Key="ModernButtonStyle"
            TargetType="Button">

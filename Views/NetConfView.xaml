@@ -186,7 +186,7 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- Custom Port Column -->
-                                <DataGridTextColumn Header="Port"
+                                <DataGridTextColumn Header="HTTP Port"
                                                     Width="50"
                                                     MinWidth="50"
                                                     MaxWidth="50"

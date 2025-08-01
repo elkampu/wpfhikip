@@ -6,8 +6,6 @@
         Hikvision,
         Dahua,
         Axis,
-        Bosch,
         Onvif,
-        Hanwha
     }
 }

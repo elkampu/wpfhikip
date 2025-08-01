@@ -58,8 +58,9 @@
                     Width="200"
                     Background="#FFFFFF"
                     Margin="10">
-            <!--<Button Content="Sites Management"
-                    Style="{StaticResource ModernMenuButtonStyle}" />-->
+            <Button Content="Sites Management"
+                    Style="{StaticResource ModernMenuButtonStyle}"
+                    Click="SiteManagerButton_Click" />
             <Button Content="Network Scanner"
                     Style="{StaticResource ModernMenuButtonStyle}"
                     Click="NetworkScannerButton_Click" />

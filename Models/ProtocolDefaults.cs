@@ -14,8 +14,6 @@
             CameraProtocol.Dahua => 80,
             CameraProtocol.Axis => 80,
             CameraProtocol.Onvif => 80,
-            CameraProtocol.Bosch => 80,
-            CameraProtocol.Hanwha => 80,
             _ => 80
         };
 

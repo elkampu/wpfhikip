@@ -35,7 +35,7 @@ namespace wpfhikip.Protocols.Common
         /// <summary>
         /// Updates camera network settings from protocol data with enhanced ONVIF support
         /// </summary>
-        public static void UpdateNetworkInfo(Camera camera, Dictionary<string, object> networkData)
+        public static void UpdateNetworkInfo(Camera camera, Dictionary<string, object> networkData, bool preserveUserTargetValues = false)
         {
             ArgumentNullException.ThrowIfNull(camera);
             ArgumentNullException.ThrowIfNull(networkData);
@@ -43,8 +43,26 @@ namespace wpfhikip.Protocols.Common
             // Ensure Settings is initialized
             camera.Settings ??= new CameraSettings();
 
-            // Subnet mask - check ONVIF-specific keys first, then generic ones
-            camera.Settings.SubnetMask = GetValueFromMultipleKeys(networkData,
+            // Store user-entered target values if we need to preserve them
+            string? userNewIP = null;
+            string? userNewMask = null;
+            string? userNewGateway = null;
+            string? userNewDNS1 = null;
+            string? userNewDNS2 = null;
+            string? userNewNTPServer = null;
+
+            if (preserveUserTargetValues)
+            {
+                userNewIP = camera.NewIP;
+                userNewMask = camera.NewMask;
+                userNewGateway = camera.NewGateway;
+                userNewDNS1 = camera.NewDNS1;
+                userNewDNS2 = camera.NewDNS2;
+                userNewNTPServer = camera.NewNTPServer;
+            }
+
+            // Update current network information from camera (these are for display in info dialog)
+            var subnetMask = GetValueFromMultipleKeys(networkData,
                 new[] {
                     "subnetMask",           // ONVIF extracted subnet mask from prefix length conversion
                     "mask",
@@ -52,8 +70,18 @@ namespace wpfhikip.Protocols.Common
                     "Network.eth0.SubnetMask"
                 }, null);
 
-            // Default gateway - check ONVIF-specific keys first
-            camera.Settings.DefaultGateway = GetValueFromMultipleKeys(networkData,
+            if (!string.IsNullOrEmpty(subnetMask))
+            {
+                camera.CurrentSubnetMask = subnetMask;
+
+                // Only update target values if not preserving user input or user hasn't entered anything
+                if (!preserveUserTargetValues || string.IsNullOrEmpty(userNewMask))
+                {
+                    camera.Settings.SubnetMask = subnetMask;
+                }
+            }
+
+            var defaultGateway = GetValueFromMultipleKeys(networkData,
                 new[] {
                     "defaultGateway",       // ONVIF extracted gateway from GetNetworkDefaultGateway
                     "gateway",
@@ -61,8 +89,17 @@ namespace wpfhikip.Protocols.Common
                     "Network.DefaultRouter"
                 }, null);
 
-            // DNS servers - check ONVIF-specific keys first
-            camera.Settings.DNS1 = GetValueFromMultipleKeys(networkData,
+            if (!string.IsNullOrEmpty(defaultGateway))
+            {
+                camera.CurrentGateway = defaultGateway;
+
+                if (!preserveUserTargetValues || string.IsNullOrEmpty(userNewGateway))
+                {
+                    camera.Settings.DefaultGateway = defaultGateway;
+                }
+            }
+
+            var dns1 = GetValueFromMultipleKeys(networkData,
                 new[] {
                     "dns1",                 // ONVIF extracted DNS1 from GetDNS
                     "primaryDNS",
@@ -70,7 +107,17 @@ namespace wpfhikip.Protocols.Common
                     "Network.NameServer1.Address"
                 }, null);
 
-            camera.Settings.DNS2 = GetValueFromMultipleKeys(networkData,
+            if (!string.IsNullOrEmpty(dns1))
+            {
+                camera.CurrentDNS1 = dns1;
+
+                if (!preserveUserTargetValues || string.IsNullOrEmpty(userNewDNS1))
+                {
+                    camera.Settings.DNS1 = dns1;
+                }
+            }
+
+            var dns2 = GetValueFromMultipleKeys(networkData,
                 new[] {
                     "dns2",                 // ONVIF extracted DNS2 from GetDNS
                     "secondaryDNS",
@@ -78,7 +125,17 @@ namespace wpfhikip.Protocols.Common
                     "Network.NameServer2.Address"
                 }, null);
 
-            // Current IP address - check ONVIF-specific keys first
+            if (!string.IsNullOrEmpty(dns2))
+            {
+                camera.CurrentDNS2 = dns2;
+
+                if (!preserveUserTargetValues || string.IsNullOrEmpty(userNewDNS2))
+                {
+                    camera.Settings.DNS2 = dns2;
+                }
+            }
+
+            // Current IP address - this should update CurrentIP, not target IP
             var currentIp = GetValueFromMultipleKeys(networkData,
                 new[] {
                     "currentIp",            // ONVIF extracted current IP from GetNetworkInterfaces
@@ -94,6 +151,15 @@ namespace wpfhikip.Protocols.Common
                 camera.CurrentIP = currentIp;
             }
 
+            // Only update target IP if not preserving user values or user hasn't set one
+            if (!string.IsNullOrEmpty(currentIp))
+            {
+                if (!preserveUserTargetValues || string.IsNullOrEmpty(userNewIP))
+                {
+                    camera.Settings.IPAddress = currentIp;
+                }
+            }
+
             // Update MAC address if available and not already set
             if (string.IsNullOrEmpty(camera.MacAddress))
             {
@@ -105,6 +171,17 @@ namespace wpfhikip.Protocols.Common
                         "Network.eth0.MACAddress",
                         "Network.Ethernet.MACAddress"
                     }, null);
+            }
+
+            // Restore user-entered target values if we were preserving them
+            if (preserveUserTargetValues)
+            {
+                if (!string.IsNullOrEmpty(userNewIP)) camera.Settings.IPAddress = userNewIP;
+                if (!string.IsNullOrEmpty(userNewMask)) camera.Settings.SubnetMask = userNewMask;
+                if (!string.IsNullOrEmpty(userNewGateway)) camera.Settings.DefaultGateway = userNewGateway;
+                if (!string.IsNullOrEmpty(userNewDNS1)) camera.Settings.DNS1 = userNewDNS1;
+                if (!string.IsNullOrEmpty(userNewDNS2)) camera.Settings.DNS2 = userNewDNS2;
+                if (!string.IsNullOrEmpty(userNewNTPServer)) camera.Settings.NTPServer = userNewNTPServer;
             }
 
             // Handle ONVIF-specific additional network information

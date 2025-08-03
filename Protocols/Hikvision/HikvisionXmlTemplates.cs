@@ -275,6 +275,59 @@ namespace wpfhikip.Protocols.Hikvision
                 var doc = XDocument.Parse(originalXml);
                 bool modified = false;
 
+                // Enhanced logging to see what values we're working with
+                camera.AddProtocolLog("Hikvision", "XML Modification Start",
+                    $"Starting network XML modification. NewIP: '{camera.NewIP}', NewMask: '{camera.NewMask}', NewGateway: '{camera.NewGateway}', NewDNS1: '{camera.NewDNS1}', NewDNS2: '{camera.NewDNS2}'",
+                    ProtocolLogLevel.Info);
+
+                // *** CRITICAL FIX: Always set addressing type to static when network config is sent ***
+                var addressingTypeElements = doc.Descendants().Where(e => e.Name.LocalName == "addressingType");
+                foreach (var addressingTypeElement in addressingTypeElements)
+                {
+                    if (!addressingTypeElement.HasElements)
+                    {
+                        var oldValue = addressingTypeElement.Value;
+                        if (oldValue != "static")
+                        {
+                            addressingTypeElement.Value = "static";
+                            modified = true;
+                            camera.AddProtocolLog("Hikvision", "Addressing Type Modified",
+                                $"Changed addressing type from '{oldValue}' to 'static'", ProtocolLogLevel.Info);
+                        }
+                        else
+                        {
+                            camera.AddProtocolLog("Hikvision", "Addressing Type",
+                                "Addressing type is already 'static'", ProtocolLogLevel.Info);
+                        }
+                    }
+                }
+
+                // If no addressingType element exists, create one
+                if (!addressingTypeElements.Any())
+                {
+                    var root = doc.Root;
+                    if (root != null)
+                    {
+                        // Find the appropriate position (after ipVersion if it exists, or as first child)
+                        var ipVersionElement = root.Elements().FirstOrDefault(e => e.Name.LocalName == "ipVersion");
+                        var ns = root.GetDefaultNamespace();
+                        var newAddressingTypeElement = new XElement(ns + "addressingType", "static");
+
+                        if (ipVersionElement != null)
+                        {
+                            ipVersionElement.AddAfterSelf(newAddressingTypeElement);
+                        }
+                        else
+                        {
+                            root.AddFirst(newAddressingTypeElement);
+                        }
+
+                        modified = true;
+                        camera.AddProtocolLog("Hikvision", "Addressing Type Created",
+                            "Created new addressing type element with value 'static'", ProtocolLogLevel.Info);
+                    }
+                }
+
                 // Handle IP address (avoid changing gateway IP)
                 if (!string.IsNullOrEmpty(camera.NewIP))
                 {
@@ -288,8 +341,11 @@ namespace wpfhikip.Protocols.Hikvision
                     {
                         if (!ipElement.HasElements)
                         {
+                            var oldValue = ipElement.Value;
                             ipElement.Value = camera.NewIP;
                             modified = true;
+                            camera.AddProtocolLog("Hikvision", "IP Address Modified",
+                                $"Changed IP address from '{oldValue}' to '{camera.NewIP}'", ProtocolLogLevel.Info);
                         }
                     }
                 }
@@ -302,13 +358,16 @@ namespace wpfhikip.Protocols.Hikvision
                     {
                         if (!maskElement.HasElements)
                         {
+                            var oldValue = maskElement.Value;
                             maskElement.Value = camera.NewMask;
                             modified = true;
+                            camera.AddProtocolLog("Hikvision", "Subnet Mask Modified",
+                                $"Changed subnet mask from '{oldValue}' to '{camera.NewMask}'", ProtocolLogLevel.Info);
                         }
                     }
                 }
 
-                // Handle gateway (nested structure)
+                // Handle gateway (nested structure) - Enhanced with better error handling
                 if (!string.IsNullOrEmpty(camera.NewGateway))
                 {
                     var gatewayElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "DefaultGateway");
@@ -317,13 +376,31 @@ namespace wpfhikip.Protocols.Hikvision
                         var gatewayIpElement = gatewayElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "ipAddress");
                         if (gatewayIpElement != null)
                         {
+                            var oldValue = gatewayIpElement.Value;
                             gatewayIpElement.Value = camera.NewGateway;
                             modified = true;
+                            camera.AddProtocolLog("Hikvision", "Gateway Modified",
+                                $"Changed gateway from '{oldValue}' to '{camera.NewGateway}'", ProtocolLogLevel.Info);
                         }
+                        else
+                        {
+                            // Create the gateway IP element if it doesn't exist
+                            var ns = gatewayElement.GetDefaultNamespace();
+                            var newIpElement = new XElement(ns + "ipAddress", camera.NewGateway);
+                            gatewayElement.Add(newIpElement);
+                            modified = true;
+                            camera.AddProtocolLog("Hikvision", "Gateway Created",
+                                $"Created new gateway element with value '{camera.NewGateway}'", ProtocolLogLevel.Info);
+                        }
+                    }
+                    else
+                    {
+                        camera.AddProtocolLog("Hikvision", "Gateway Warning",
+                            "DefaultGateway element not found in XML structure", ProtocolLogLevel.Warning);
                     }
                 }
 
-                // Handle Primary DNS (nested structure)
+                // Handle Primary DNS (nested structure) - Enhanced with better error handling
                 if (!string.IsNullOrEmpty(camera.NewDNS1))
                 {
                     var primaryDnsElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "PrimaryDNS");
@@ -332,13 +409,31 @@ namespace wpfhikip.Protocols.Hikvision
                         var dnsIpElement = primaryDnsElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "ipAddress");
                         if (dnsIpElement != null)
                         {
+                            var oldValue = dnsIpElement.Value;
                             dnsIpElement.Value = camera.NewDNS1;
                             modified = true;
+                            camera.AddProtocolLog("Hikvision", "Primary DNS Modified",
+                                $"Changed primary DNS from '{oldValue}' to '{camera.NewDNS1}'", ProtocolLogLevel.Info);
                         }
+                        else
+                        {
+                            // Create the DNS IP element if it doesn't exist
+                            var ns = primaryDnsElement.GetDefaultNamespace();
+                            var newIpElement = new XElement(ns + "ipAddress", camera.NewDNS1);
+                            primaryDnsElement.Add(newIpElement);
+                            modified = true;
+                            camera.AddProtocolLog("Hikvision", "Primary DNS Created",
+                                $"Created new primary DNS element with value '{camera.NewDNS1}'", ProtocolLogLevel.Info);
+                        }
+                    }
+                    else
+                    {
+                        camera.AddProtocolLog("Hikvision", "Primary DNS Warning",
+                            "PrimaryDNS element not found in XML structure", ProtocolLogLevel.Warning);
                     }
                 }
 
-                // Handle Secondary DNS (nested structure)
+                // Handle Secondary DNS (nested structure) - Enhanced with better error handling
                 if (!string.IsNullOrEmpty(camera.NewDNS2))
                 {
                     var secondaryDnsElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "SecondaryDNS");
@@ -347,24 +442,70 @@ namespace wpfhikip.Protocols.Hikvision
                         var dnsIpElement = secondaryDnsElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "ipAddress");
                         if (dnsIpElement != null)
                         {
+                            var oldValue = dnsIpElement.Value;
                             dnsIpElement.Value = camera.NewDNS2;
                             modified = true;
+                            camera.AddProtocolLog("Hikvision", "Secondary DNS Modified",
+                                $"Changed secondary DNS from '{oldValue}' to '{camera.NewDNS2}'", ProtocolLogLevel.Info);
                         }
+                        else
+                        {
+                            // Create the DNS IP element if it doesn't exist
+                            var ns = secondaryDnsElement.GetDefaultNamespace();
+                            var newIpElement = new XElement(ns + "ipAddress", camera.NewDNS2);
+                            secondaryDnsElement.Add(newIpElement);
+                            modified = true;
+                            camera.AddProtocolLog("Hikvision", "Secondary DNS Created",
+                                $"Created new secondary DNS element with value '{camera.NewDNS2}'", ProtocolLogLevel.Info);
+                        }
+                    }
+                    else
+                    {
+                        camera.AddProtocolLog("Hikvision", "Secondary DNS Warning",
+                            "SecondaryDNS element not found in XML structure", ProtocolLogLevel.Warning);
                     }
                 }
 
-                return modified ? doc.ToString() : originalXml;
+                // Enhanced logging for modification results
+                if (modified)
+                {
+                    camera.AddProtocolLog("Hikvision", "XML Modification Complete",
+                        "Network XML successfully modified with new values", ProtocolLogLevel.Success);
+                }
+                else
+                {
+                    camera.AddProtocolLog("Hikvision", "XML Modification",
+                        "No modifications were made to the XML (no new values provided or values already current)", ProtocolLogLevel.Info);
+                }
+
+                return doc.ToString();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                camera.AddProtocolLog("Hikvision", "XML Modification Error",
+                    $"Failed to modify network XML: {ex.Message}", ProtocolLogLevel.Error);
+
                 // Fallback to template-based approach
+                camera.AddProtocolLog("Hikvision", "XML Fallback",
+                    "Attempting fallback template-based modification", ProtocolLogLevel.Warning);
+
                 var newValues = new Dictionary<string, string>();
+
+                // Always set addressing type to static in fallback mode too
+                newValues["addressingType"] = "static";
 
                 if (!string.IsNullOrEmpty(camera.NewIP))
                     newValues["ipAddress"] = camera.NewIP;
 
                 if (!string.IsNullOrEmpty(camera.NewMask))
                     newValues["subnetMask"] = camera.NewMask;
+
+                // Note: Gateway and DNS cannot be properly handled in fallback mode due to nested structure
+                if (!string.IsNullOrEmpty(camera.NewGateway) || !string.IsNullOrEmpty(camera.NewDNS1) || !string.IsNullOrEmpty(camera.NewDNS2))
+                {
+                    camera.AddProtocolLog("Hikvision", "Fallback Limitation",
+                        "Gateway and DNS settings cannot be applied in fallback mode due to nested XML structure", ProtocolLogLevel.Warning);
+                }
 
                 return ModifyXmlTemplate(originalXml, newValues);
             }
@@ -428,36 +569,104 @@ namespace wpfhikip.Protocols.Hikvision
 
         private static bool HasNetworkConfigChanged(Dictionary<string, string> currentValues, Camera camera)
         {
+            // Enhanced logging to help debug configuration comparison
+            camera.AddProtocolLog("Hikvision", "Config Comparison Start",
+                $"Starting configuration comparison. Camera values: NewIP='{camera.NewIP}', NewMask='{camera.NewMask}', NewGateway='{camera.NewGateway}', NewDNS1='{camera.NewDNS1}', NewDNS2='{camera.NewDNS2}'",
+                ProtocolLogLevel.Info);
+
+            camera.AddProtocolLog("Hikvision", "Config Comparison Current",
+                $"Current device values: IP='{currentValues.GetValueOrDefault("ipAddress")}', Mask='{currentValues.GetValueOrDefault("subnetMask")}', Gateway='{currentValues.GetValueOrDefault("defaultGateway")}', DNS1='{currentValues.GetValueOrDefault("primaryDNS")}', DNS2='{currentValues.GetValueOrDefault("secondaryDNS")}', AddressingType='{currentValues.GetValueOrDefault("addressingType")}'",
+                ProtocolLogLevel.Info);
+
+            // *** CRITICAL FIX: Always update if addressing type is not static ***
+            var currentAddressingType = currentValues.GetValueOrDefault("addressingType");
+            if (currentAddressingType != "static")
+            {
+                camera.AddProtocolLog("Hikvision", "Force Static Addressing",
+                    $"Addressing type is '{currentAddressingType}', forcing update to set it to 'static'", ProtocolLogLevel.Info);
+                return true;
+            }
+
+            // *** CRITICAL FIX: Force configuration change if ANY field has a value ***
+            bool hasAnyNewValue = !string.IsNullOrEmpty(camera.NewIP) ||
+                                  !string.IsNullOrEmpty(camera.NewMask) ||
+                                  !string.IsNullOrEmpty(camera.NewGateway) ||
+                                  !string.IsNullOrEmpty(camera.NewDNS1) ||
+                                  !string.IsNullOrEmpty(camera.NewDNS2);
+
+            if (!hasAnyNewValue)
+            {
+                camera.AddProtocolLog("Hikvision", "No New Values",
+                    "No new configuration values provided", ProtocolLogLevel.Info);
+                return false;
+            }
+
             // Check if IP address changed
             if (!string.IsNullOrEmpty(camera.NewIP) &&
                 currentValues.GetValueOrDefault("ipAddress") != camera.NewIP)
+            {
+                camera.AddProtocolLog("Hikvision", "IP Change Detected",
+                    $"IP address change: '{currentValues.GetValueOrDefault("ipAddress")}' → '{camera.NewIP}'", ProtocolLogLevel.Info);
                 return true;
+            }
 
             // Check if subnet mask changed
             if (!string.IsNullOrEmpty(camera.NewMask) &&
                 currentValues.GetValueOrDefault("subnetMask") != camera.NewMask)
+            {
+                camera.AddProtocolLog("Hikvision", "Mask Change Detected",
+                    $"Subnet mask change: '{currentValues.GetValueOrDefault("subnetMask")}' → '{camera.NewMask}'", ProtocolLogLevel.Info);
                 return true;
+            }
 
             // Check if gateway changed
             if (!string.IsNullOrEmpty(camera.NewGateway) &&
                 currentValues.GetValueOrDefault("defaultGateway") != camera.NewGateway)
+            {
+                camera.AddProtocolLog("Hikvision", "Gateway Change Detected",
+                    $"Gateway change: '{currentValues.GetValueOrDefault("defaultGateway")}' → '{camera.NewGateway}'", ProtocolLogLevel.Info);
                 return true;
+            }
 
             // Check if Primary DNS changed
             if (!string.IsNullOrEmpty(camera.NewDNS1) &&
                 currentValues.GetValueOrDefault("primaryDNS") != camera.NewDNS1)
+            {
+                camera.AddProtocolLog("Hikvision", "Primary DNS Change Detected",
+                    $"Primary DNS change: '{currentValues.GetValueOrDefault("primaryDNS")}' → '{camera.NewDNS1}'", ProtocolLogLevel.Info);
                 return true;
+            }
 
             // Check if Secondary DNS changed
             if (!string.IsNullOrEmpty(camera.NewDNS2) &&
                 currentValues.GetValueOrDefault("secondaryDNS") != camera.NewDNS2)
+            {
+                camera.AddProtocolLog("Hikvision", "Secondary DNS Change Detected",
+                    $"Secondary DNS change: '{currentValues.GetValueOrDefault("secondaryDNS")}' → '{camera.NewDNS2}'", ProtocolLogLevel.Info);
                 return true;
+            }
 
+            // *** CRITICAL FIX: If we have new values but they match current values, still send the config ***
+            // This handles cases where the parsing might not be perfect or there are minor format differences
+            if (hasAnyNewValue)
+            {
+                camera.AddProtocolLog("Hikvision", "Force Config Update",
+                    "New configuration values provided. Forcing configuration update to ensure all settings are applied.", ProtocolLogLevel.Info);
+                return true;
+            }
+
+            camera.AddProtocolLog("Hikvision", "No Config Changes",
+                "No network configuration changes detected", ProtocolLogLevel.Info);
             return false;
         }
         private static bool HasNtpConfigChanged(Dictionary<string, string> currentValues, Camera camera)
         {
-            return currentValues.GetValueOrDefault("ipAddress") != camera.NewNTPServer;
+            // For NTP, also force update if there's a new value
+            if (!string.IsNullOrEmpty(camera.NewNTPServer))
+            {
+                return true; // Always update if new NTP server is provided
+            }
+            return false;
         }
 
         /// <summary>
@@ -507,7 +716,6 @@ namespace wpfhikip.Protocols.Hikvision
     </Ipv6Mode>
 </IPAddress>";
         }
-
         private static string CreateTimeConfigXml(Dictionary<string, string> parameters)
         {
             return $@"<?xml version='1.0' encoding='UTF-8'?>

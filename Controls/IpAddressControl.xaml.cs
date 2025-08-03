@@ -1,9 +1,11 @@
-﻿using System.Text.RegularExpressions;
+﻿using System;
+using System.Linq;
+using System.Net;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
-using System.Net;
 
 namespace wpfhikip.Controls
 {
@@ -32,7 +34,7 @@ namespace wpfhikip.Controls
             this.MouseLeftButtonDown += IpAddressControl_MouseLeftButtonDown;
             this.Focusable = true; // Make the control itself focusable
 
-            // Add paste handling for the entire control
+            // Add paste handling for the entire control - but check if DataGrid is managing it
             this.PreviewKeyDown += IpAddressControl_PreviewKeyDown;
         }
 
@@ -69,9 +71,17 @@ namespace wpfhikip.Controls
 
         private void IpAddressControl_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            // Handle Ctrl+V for paste
+            // Only handle paste if not managed by DataGrid
             if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
+                // Check if this control is managed by DataGrid (set in NetConfView)
+                if (this.Tag?.ToString() == "DataGridManaged")
+                {
+                    // Let DataGrid handle the paste operation
+                    return; // Don't set e.Handled = true
+                }
+
+                // Handle paste normally for standalone usage
                 HandlePaste();
                 e.Handled = true;
             }
@@ -82,26 +92,33 @@ namespace wpfhikip.Controls
             if (!Clipboard.ContainsText())
                 return;
 
-            var clipboardText = Clipboard.GetText();
-            var extractedIp = ExtractIpAddressFromText(clipboardText);
-
-            if (string.IsNullOrEmpty(extractedIp))
+            try
             {
-                ShowIpValidationError("Invalid IP address format in clipboard. Supported formats:\n" +
-                                    "• xxx.xxx.xxx.xxx\n" +
-                                    "• http://xxx.xxx.xxx.xxx/\n" +
-                                    "• https://xxx.xxx.xxx.xxx/");
-                return;
-            }
+                var clipboardText = Clipboard.GetText();
+                var extractedIp = ExtractIpAddressFromText(clipboardText);
 
-            if (!IsValidIpAddressFormat(extractedIp))
+                if (string.IsNullOrEmpty(extractedIp))
+                {
+                    ShowIpValidationError("Invalid IP address format in clipboard. Supported formats:\n" +
+                                        "• xxx.xxx.xxx.xxx\n" +
+                                        "• http://xxx.xxx.xxx.xxx/\n" +
+                                        "• https://xxx.xxx.xxx.xxx/");
+                    return;
+                }
+
+                if (!IsValidIpAddressFormat(extractedIp))
+                {
+                    ShowIpValidationError("The clipboard contains an invalid IP address.\nPlease ensure the IP address is in correct format (0-255 for each octet).");
+                    return;
+                }
+
+                // Set the IP address
+                IpAddress = extractedIp;
+            }
+            catch (Exception ex)
             {
-                ShowIpValidationError("The clipboard contains an invalid IP address.\nPlease ensure the IP address is in correct format (0-255 for each octet).");
-                return;
+                ShowIpValidationError($"Error accessing clipboard: {ex.Message}");
             }
-
-            // Set the IP address
-            IpAddress = extractedIp;
         }
 
         private string ExtractIpAddressFromText(string text)
@@ -231,9 +248,16 @@ namespace wpfhikip.Controls
         {
             var textBox = sender as TextBox;
 
-            // Handle Ctrl+V for paste in individual textboxes
+            // Handle Ctrl+V for paste in individual textboxes - but check DataGrid management
             if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
+                // Check if this control is managed by DataGrid
+                if (this.Tag?.ToString() == "DataGridManaged")
+                {
+                    // Let DataGrid handle the paste operation
+                    return; // Don't set e.Handled = true
+                }
+
                 HandlePaste();
                 e.Handled = true;
                 return;

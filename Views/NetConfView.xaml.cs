@@ -31,10 +31,10 @@ namespace wpfhikip.Views
             {
                 var columnHeader = templateColumn.Header?.ToString();
 
-                // Check if this is one of the IP Address columns (including DNS1 and DNS2)
-                if (columnHeader == "Current IP" || columnHeader == "New IP" ||
-                    columnHeader == "Mask" || columnHeader == "Gateway" ||
-                    columnHeader == "DNS1" || columnHeader == "DNS2" || columnHeader == "NTP")
+                // Check if this is one of the IP Address columns (updated with correct headers)
+                if (columnHeader == "Current IP" || columnHeader == "Target IP" ||
+                    columnHeader == "Target Mask" || columnHeader == "Target Gateway" ||
+                    columnHeader == "Target Primary DNS" || columnHeader == "Target Secondary DNS" || columnHeader == "NTP")
                 {
                     // Use dispatcher to ensure the edit template is loaded before trying to find the control
                     Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
@@ -164,11 +164,11 @@ namespace wpfhikip.Views
             return columnHeader switch
             {
                 "Current IP" => camera.CurrentIP,
-                "New IP" => camera.NewIP,
-                "Mask" => camera.NewMask,
-                "Gateway" => camera.NewGateway,
-                "DNS1" => camera.NewDNS1,
-                "DNS2" => camera.NewDNS2,
+                "Target IP" => camera.NewIP,  // Updated to match XAML
+                "Target Mask" => camera.NewMask,  // Updated to match XAML
+                "Target Gateway" => camera.NewGateway,  // Updated to match XAML
+                "Target Primary DNS" => camera.NewDNS1,  // Updated to match XAML
+                "Target Secondary DNS" => camera.NewDNS2,  // Updated to match XAML
                 "NTP" => camera.NewNTPServer,
                 _ => string.Empty
             };
@@ -204,9 +204,9 @@ namespace wpfhikip.Views
 
         private bool IsIpAddressColumn(string columnHeader)
         {
-            return columnHeader == "Current IP" || columnHeader == "New IP" ||
-                   columnHeader == "Mask" || columnHeader == "Gateway" ||
-                   columnHeader == "DNS1" || columnHeader == "DNS2" || columnHeader == "NTP";
+            return columnHeader == "Current IP" || columnHeader == "Target IP" ||
+                   columnHeader == "Target Mask" || columnHeader == "Target Gateway" ||
+                   columnHeader == "Target Primary DNS" || columnHeader == "Target Secondary DNS" || columnHeader == "NTP";
         }
 
         private void PasteIpAddress(string clipboardText, string columnHeader, Camera camera)
@@ -230,25 +230,25 @@ namespace wpfhikip.Views
                 return;
             }
 
-            // Set the IP address to the appropriate property
+            // Set the IP address to the appropriate property (updated column names)
             switch (columnHeader)
             {
                 case "Current IP":
                     camera.CurrentIP = extractedIp;
                     break;
-                case "New IP":
+                case "Target IP":  // Updated to match XAML
                     camera.NewIP = extractedIp;
                     break;
-                case "Mask":
+                case "Target Mask":  // Updated to match XAML
                     camera.NewMask = extractedIp;
                     break;
-                case "Gateway":
+                case "Target Gateway":  // Updated to match XAML
                     camera.NewGateway = extractedIp;
                     break;
-                case "DNS1":
+                case "Target Primary DNS":  // Updated to match XAML
                     camera.NewDNS1 = extractedIp;
                     break;
-                case "DNS2":
+                case "Target Secondary DNS":  // Updated to match XAML
                     camera.NewDNS2 = extractedIp;
                     break;
                 case "NTP":

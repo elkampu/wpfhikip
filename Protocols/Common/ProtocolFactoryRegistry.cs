@@ -1,8 +1,9 @@
 ﻿using System.Collections.Frozen;
+
 using wpfhikip.Models;
-using wpfhikip.Protocols.Hikvision;
-using wpfhikip.Protocols.Dahua;
 using wpfhikip.Protocols.Axis;
+using wpfhikip.Protocols.Dahua;
+using wpfhikip.Protocols.Hikvision;
 using wpfhikip.Protocols.Onvif;
 
 namespace wpfhikip.Protocols.Common
@@ -16,7 +17,7 @@ namespace wpfhikip.Protocols.Common
             new Dictionary<CameraProtocol, IProtocolFactory>
             {
                 { CameraProtocol.Hikvision, new HikvisionProtocolFactory() },
-                //{ CameraProtocol.Dahua, new DahuaProtocolFactory() },
+                { CameraProtocol.Dahua, new DahuaProtocolFactory() },
                 { CameraProtocol.Axis, new AxisProtocolFactory() },
                 { CameraProtocol.Onvif, new OnvifProtocolFactory() }
             }.ToFrozenDictionary();

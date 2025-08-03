@@ -225,7 +225,6 @@ namespace wpfhikip.Protocols.Onvif
                 return ProtocolOperationResult<Dictionary<string, object>>.CreateFailure(ex.Message);
             }
         }
-
         /// <summary>
         /// Sets network configuration on the ONVIF device
         /// </summary>
@@ -233,40 +232,192 @@ namespace wpfhikip.Protocols.Onvif
         {
             try
             {
+                // Validate that we have the minimum required configuration
+                if (string.IsNullOrEmpty(camera.NewIP))
+                {
+                    var errorMsg = "Target IP address is required for network configuration";
+                    camera.AddProtocolLog("ONVIF", "Network Config Validation", errorMsg, ProtocolLogLevel.Error);
+                    return ProtocolOperationResult<bool>.CreateFailure(errorMsg);
+                }
+
+                // Log the network configuration we're about to send
+                camera.AddProtocolLog("ONVIF", "Network Config Setup",
+                    $"Setting network config - IP: {camera.NewIP}, Mask: {camera.NewMask ?? "255.255.255.0"}, Gateway: {camera.NewGateway}, DNS1: {camera.NewDNS1}, DNS2: {camera.NewDNS2}");
+
                 // Get current network interfaces to find the token
                 var getNetworkRequest = OnvifSoapTemplates.CreateGetNetworkInterfacesRequest(_connection.Username, _connection.Password);
                 var getResponse = await _connection.SendSoapToDeviceServiceAsync(getNetworkRequest, OnvifUrl.SoapActions.GetNetworkInterfaces);
 
                 if (!getResponse.Success)
                 {
+                    camera.AddProtocolLog("ONVIF", "Network Config Error",
+                        $"Failed to get network interfaces: {getResponse.StatusCode}", ProtocolLogLevel.Error);
                     return ProtocolOperationResult<bool>.CreateFailure($"Failed to get network interfaces: {getResponse.StatusCode}");
                 }
 
-                var interfaceToken = OnvifSoapTemplates.ExtractNetworkInterfaceToken(getResponse.Content);
+                if (OnvifSoapTemplates.IsSoapFault(getResponse.Content))
+                {
+                    var faultString = OnvifSoapTemplates.ExtractSoapFaultString(getResponse.Content);
+                    camera.AddProtocolLog("ONVIF", "Network Config Error",
+                        $"SOAP fault getting interfaces: {faultString}", ProtocolLogLevel.Error);
+                    return ProtocolOperationResult<bool>.CreateFailure($"SOAP fault getting interfaces: {faultString}");
+                }
 
-                // Set new network configuration
+                var interfaceToken = OnvifSoapTemplates.ExtractNetworkInterfaceToken(getResponse.Content);
+                camera.AddProtocolLog("ONVIF", "Network Config",
+                    $"Using interface token: {interfaceToken}");
+
+                // Create and log the complete network configuration request
                 var setNetworkRequest = OnvifSoapTemplates.CreateSetNetworkInterfacesRequest(camera, interfaceToken, _connection.Username, _connection.Password);
+                camera.AddProtocolLog("ONVIF", "Network Config SOAP",
+                    $"Sending complete network config with DHCP=false, Manual IP={camera.NewIP}, PrefixLength={OnvifSoapTemplates.CalculatePrefixLength(camera.NewMask ?? "255.255.255.0")}");
+
+                // Log the actual SOAP content for debugging (truncated)
+                var soapPreview = setNetworkRequest.Length > 800 ? setNetworkRequest.Substring(0, 800) + "..." : setNetworkRequest;
+                camera.AddProtocolLog("ONVIF", "SOAP Request Preview", soapPreview, ProtocolLogLevel.Info);
+
+                // Set network configuration in a single atomic request
                 var setResponse = await _connection.SendSoapToDeviceServiceAsync(setNetworkRequest, OnvifUrl.SoapActions.SetNetworkInterfaces);
 
                 if (!setResponse.Success)
                 {
+                    camera.AddProtocolLog("ONVIF", "Network Config Error",
+                        $"Failed to set network config: {setResponse.StatusCode} - Response: {setResponse.Content}", ProtocolLogLevel.Error);
                     return ProtocolOperationResult<bool>.CreateFailure($"Failed to set network config: {setResponse.StatusCode}");
                 }
 
                 if (OnvifSoapTemplates.IsSoapFault(setResponse.Content))
                 {
                     var faultString = OnvifSoapTemplates.ExtractSoapFaultString(setResponse.Content);
+                    camera.AddProtocolLog("ONVIF", "Network Config Error",
+                        $"SOAP fault setting network: {faultString}", ProtocolLogLevel.Error);
+
+                    // Log the full response for debugging
+                    camera.AddProtocolLog("ONVIF", "SOAP Fault Response", setResponse.Content, ProtocolLogLevel.Error);
                     return ProtocolOperationResult<bool>.CreateFailure($"SOAP fault: {faultString}");
+                }
+
+                camera.AddProtocolLog("ONVIF", "Network Config Success",
+                    "Network interface configuration sent successfully", ProtocolLogLevel.Success);
+
+                // Log the successful response
+                camera.AddProtocolLog("ONVIF", "Network Config Response", setResponse.Content, ProtocolLogLevel.Info);
+
+                // If gateway is specified, set it separately
+                if (!string.IsNullOrEmpty(camera.NewGateway))
+                {
+                    camera.AddProtocolLog("ONVIF", "Gateway Config",
+                        $"Setting gateway to: {camera.NewGateway}");
+                    var gatewaySuccess = await SetDefaultGatewayAsync(camera, camera.NewGateway, cancellationToken);
+                    if (gatewaySuccess)
+                    {
+                        camera.AddProtocolLog("ONVIF", "Gateway Config Success",
+                            "Gateway configuration sent successfully", ProtocolLogLevel.Success);
+                    }
+                    else
+                    {
+                        camera.AddProtocolLog("ONVIF", "Gateway Config Warning",
+                            "Gateway configuration may have failed", ProtocolLogLevel.Warning);
+                    }
+                }
+
+                // If DNS servers are specified, set them separately  
+                if (!string.IsNullOrEmpty(camera.NewDNS1) || !string.IsNullOrEmpty(camera.NewDNS2))
+                {
+                    camera.AddProtocolLog("ONVIF", "DNS Config",
+                        $"Setting DNS servers - Primary: {camera.NewDNS1}, Secondary: {camera.NewDNS2}");
+                    var dnsSuccess = await SetDNSConfigurationAsync(camera, cancellationToken);
+                    if (dnsSuccess)
+                    {
+                        camera.AddProtocolLog("ONVIF", "DNS Config Success",
+                            "DNS configuration sent successfully", ProtocolLogLevel.Success);
+                    }
+                    else
+                    {
+                        camera.AddProtocolLog("ONVIF", "DNS Config Warning",
+                            "DNS configuration may have failed", ProtocolLogLevel.Warning);
+                    }
                 }
 
                 return ProtocolOperationResult<bool>.CreateSuccess(true);
             }
             catch (Exception ex)
             {
+                camera.AddProtocolLog("ONVIF", "Network Config Exception",
+                    $"Exception during network configuration: {ex.Message}", ProtocolLogLevel.Error);
                 return ProtocolOperationResult<bool>.CreateFailure(ex.Message);
             }
         }
 
+        /// <summary>
+        /// Sets the default gateway on the ONVIF device
+        /// </summary>
+        private async Task<bool> SetDefaultGatewayAsync(Camera camera, string gatewayIP, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var setGatewayRequest = OnvifSoapTemplates.CreateSetNetworkDefaultGatewayRequest(gatewayIP, _connection.Username, _connection.Password);
+                var response = await _connection.SendSoapToDeviceServiceAsync(setGatewayRequest, OnvifUrl.SoapActions.SetNetworkDefaultGateway);
+
+                if (!response.Success)
+                {
+                    camera.AddProtocolLog("ONVIF", "Gateway Config Error",
+                        $"Failed to set gateway: {response.StatusCode}", ProtocolLogLevel.Warning);
+                    return false;
+                }
+
+                if (OnvifSoapTemplates.IsSoapFault(response.Content))
+                {
+                    var faultString = OnvifSoapTemplates.ExtractSoapFaultString(response.Content);
+                    camera.AddProtocolLog("ONVIF", "Gateway Config SOAP Fault",
+                        $"SOAP fault setting gateway: {faultString}", ProtocolLogLevel.Warning);
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                camera.AddProtocolLog("ONVIF", "Gateway Config Exception",
+                    $"Exception setting gateway: {ex.Message}", ProtocolLogLevel.Warning);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Sets DNS configuration on the ONVIF device
+        /// </summary>
+        private async Task<bool> SetDNSConfigurationAsync(Camera camera, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var setDNSRequest = OnvifSoapTemplates.CreateSetDNSRequest(camera, _connection.Username, _connection.Password);
+                var response = await _connection.SendSoapToDeviceServiceAsync(setDNSRequest, OnvifUrl.SoapActions.SetDNS);
+
+                if (!response.Success)
+                {
+                    camera.AddProtocolLog("ONVIF", "DNS Config Error",
+                        $"Failed to set DNS: {response.StatusCode}", ProtocolLogLevel.Warning);
+                    return false;
+                }
+
+                if (OnvifSoapTemplates.IsSoapFault(response.Content))
+                {
+                    var faultString = OnvifSoapTemplates.ExtractSoapFaultString(response.Content);
+                    camera.AddProtocolLog("ONVIF", "DNS Config SOAP Fault",
+                        $"SOAP fault setting DNS: {faultString}", ProtocolLogLevel.Warning);
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                camera.AddProtocolLog("ONVIF", "DNS Config Exception",
+                    $"Exception setting DNS: {ex.Message}", ProtocolLogLevel.Warning);
+                return false;
+            }
+        }
         public void Dispose()
         {
             if (!_disposed)

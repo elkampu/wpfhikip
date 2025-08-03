@@ -22,6 +22,12 @@ namespace wpfhikip.Models
         private bool _isAuthenticated;
         private bool _requiresAuthentication;
 
+        // Add fields for current network information from camera (separate from target values)
+        private string? _currentSubnetMask;
+        private string? _currentGateway;
+        private string? _currentDNS1;
+        private string? _currentDNS2;
+
         private readonly ConcurrentQueue<ProtocolLogEntry> _protocolLogs = new();
 
         // Basic properties
@@ -59,7 +65,6 @@ namespace wpfhikip.Models
             get => _macAddress;
             set => SetProperty(ref _macAddress, value);
         }
-
 
         /// <summary>
         /// Indicates if the camera is compatible with any protocol
@@ -134,6 +139,31 @@ namespace wpfhikip.Models
             }
         }
 
+        // Add properties for current network information from camera (read-only, populated by info retrieval)
+        public string? CurrentSubnetMask
+        {
+            get => _currentSubnetMask;
+            set => SetProperty(ref _currentSubnetMask, value);
+        }
+
+        public string? CurrentGateway
+        {
+            get => _currentGateway;
+            set => SetProperty(ref _currentGateway, value);
+        }
+
+        public string? CurrentDNS1
+        {
+            get => _currentDNS1;
+            set => SetProperty(ref _currentDNS1, value);
+        }
+
+        public string? CurrentDNS2
+        {
+            get => _currentDNS2;
+            set => SetProperty(ref _currentDNS2, value);
+        }
+
         // UI-related properties
         public bool IsSelected
         {
@@ -156,7 +186,6 @@ namespace wpfhikip.Models
             ? _status
             : _status.Length > 10 ? string.Concat(_status.AsSpan(0, 7), "...") : _status;
 
-
         [JsonIgnore]
         public Brush? CellColor
         {
@@ -170,7 +199,6 @@ namespace wpfhikip.Models
             get => _cellFontWeight;
             set => SetProperty(ref _cellFontWeight, value);
         }
-
 
         public bool IsCompleted
         {
@@ -372,30 +400,5 @@ namespace wpfhikip.Models
             while (_protocolLogs.TryDequeue(out _)) { }
             OnPropertyChanged(nameof(ProtocolLogs));
         }
-    }
-
-    /// <summary>
-    /// Represents a single protocol checking log entry
-    /// </summary>
-    public sealed record ProtocolLogEntry
-    {
-        public DateTime Timestamp { get; init; }
-        public string Protocol { get; init; } = string.Empty;
-        public string Step { get; init; } = string.Empty;
-        public string Details { get; init; } = string.Empty;
-        public ProtocolLogLevel Level { get; init; }
-        public string IpAddress { get; init; } = string.Empty;
-        public int Port { get; init; }
-
-        public string FormattedTimestamp => Timestamp.ToString("HH:mm:ss.fff");
-
-        public string LogIcon => Level switch
-        {
-            ProtocolLogLevel.Info => "→",
-            ProtocolLogLevel.Success => "✓",
-            ProtocolLogLevel.Warning => "⚠",
-            ProtocolLogLevel.Error => "✗",
-            _ => "•"
-        };
     }
 }

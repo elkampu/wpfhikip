@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Threading;
 
 using wpfhikip.Models;
 using wpfhikip.Protocols.Common;
@@ -17,7 +16,6 @@ namespace wpfhikip.ViewModels.Dialogs
     {
         private readonly Camera _camera;
         private CancellationTokenSource? _loadingCancellation;
-        private DispatcherTimer? _refreshTimer;
         private bool _disposed;
 
         private bool _isLoading;
@@ -60,7 +58,6 @@ namespace wpfhikip.ViewModels.Dialogs
             _camera = camera ?? throw new ArgumentNullException(nameof(camera));
 
             InitializeBasicInfo();
-            InitializeAutoRefresh();
 
             // Commands
             RefreshCommand = new RelayCommand(async _ => await RefreshCameraInfoAsync(), _ => !IsLoading);
@@ -327,24 +324,6 @@ namespace wpfhikip.ViewModels.Dialogs
             await RefreshCameraInfoAsync();
         }
 
-        private void InitializeAutoRefresh()
-        {
-            _refreshTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromSeconds(30) // Refresh every 30 seconds
-            };
-            _refreshTimer.Tick += async (s, e) => await AutoRefreshTimerTick();
-            _refreshTimer.Start(); // Start automatic refresh immediately
-        }
-
-        private async Task AutoRefreshTimerTick()
-        {
-            if (!IsLoading)
-            {
-                await RefreshCameraInfoAsync();
-            }
-        }
-
         private async Task RefreshCameraInfoAsync()
         {
             _loadingCancellation?.Cancel();
@@ -409,16 +388,16 @@ namespace wpfhikip.ViewModels.Dialogs
             SerialNumber = _camera.SerialNumber ?? "Not detected";
             MacAddress = _camera.MacAddress ?? "Not detected";
 
-            // Update network information - show "Not configured" for null/empty values
+            // Update network information - use Current properties for actual camera values
             CurrentIp = _camera.CurrentIP ?? "N/A";
-            SubnetMask = _camera.Settings?.SubnetMask ?? "Not configured";
-            Gateway = _camera.Settings?.DefaultGateway ?? "Not configured";
-            Dns1 = _camera.Settings?.DNS1 ?? "Not configured";
-            Dns2 = _camera.Settings?.DNS2 ?? "Not configured";
+            SubnetMask = _camera.CurrentSubnetMask ?? "Not configured";
+            Gateway = _camera.CurrentGateway ?? "Not configured";
+            Dns1 = _camera.CurrentDNS1 ?? "Not configured";
+            Dns2 = _camera.CurrentDNS2 ?? "Not configured";
 
-            // Debug logging to help identify the issue
+            // Debug logging to help identify the values being used
             _camera.AddProtocolLog("UI Update", "Network Values",
-                $"Settings: SubnetMask='{_camera.Settings?.SubnetMask}', Gateway='{_camera.Settings?.DefaultGateway}', DNS1='{_camera.Settings?.DNS1}', DNS2='{_camera.Settings?.DNS2}'",
+                $"Current: SubnetMask='{_camera.CurrentSubnetMask}', Gateway='{_camera.CurrentGateway}', DNS1='{_camera.CurrentDNS1}', DNS2='{_camera.CurrentDNS2}'",
                 ProtocolLogLevel.Info);
 
             // Update video stream information - show "Not available" for null/empty values
@@ -470,8 +449,6 @@ namespace wpfhikip.ViewModels.Dialogs
                 {
                     _loadingCancellation?.Cancel();
                     _loadingCancellation?.Dispose();
-                    _refreshTimer?.Stop();
-                    _refreshTimer = null;
                 }
                 _disposed = true;
             }

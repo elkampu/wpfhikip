@@ -506,7 +506,8 @@ namespace wpfhikip.Protocols.Common
                             $"{item.Key}: {item.Value}", ProtocolLogLevel.Info);
                     }
 
-                    CameraDataProcessor.UpdateNetworkInfo(camera, networkData);
+                    // Preserve user-entered target values during compatibility check
+                    CameraDataProcessor.UpdateNetworkInfo(camera, networkData, preserveUserTargetValues: true);
                     return true;
                 }
                 else

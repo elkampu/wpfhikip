@@ -302,6 +302,49 @@ namespace wpfhikip.Protocols.Onvif
         /// </summary>
         public static string CreateSetNetworkInterfacesRequest(Camera camera, string interfaceToken, string username, string password)
         {
+            // Validate inputs
+            if (string.IsNullOrEmpty(camera.NewIP))
+            {
+                throw new ArgumentException("Target IP address is required for network configuration");
+            }
+
+            var prefixLength = CalculatePrefixLength(camera.NewMask ?? "255.255.255.0");
+
+            // Create the SOAP body with both DHCP disabled AND manual configuration in one request
+            // This is the correct ONVIF approach - provide the complete configuration atomically
+            var body = $@"<tds:SetNetworkInterfaces>
+        <tds:InterfaceToken>{interfaceToken}</tds:InterfaceToken>
+        <tds:NetworkInterface>
+            <tt:Enabled>true</tt:Enabled>
+            <tt:IPv4>
+                <tt:Enabled>true</tt:Enabled>
+                <tt:Config>
+                    <tt:DHCP>false</tt:DHCP>
+                    <tt:Manual>
+                        <tt:Address>{camera.NewIP}</tt:Address>
+                        <tt:PrefixLength>{prefixLength}</tt:PrefixLength>
+                    </tt:Manual>
+                </tt:Config>
+            </tt:IPv4>
+        </tds:NetworkInterface>
+    </tds:SetNetworkInterfaces>";
+
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
+        }
+
+        /// <summary>
+        /// Creates a separate SetNetworkInterfaces request for manual IP configuration
+        /// This is called after DHCP is disabled to set the manual configuration
+        /// </summary>
+        public static string CreateSetNetworkInterfacesManualRequest(Camera camera, string interfaceToken, string username, string password)
+        {
+            if (string.IsNullOrEmpty(camera.NewIP))
+            {
+                throw new ArgumentException("Target IP address is required for network configuration");
+            }
+
+            var prefixLength = CalculatePrefixLength(camera.NewMask ?? "255.255.255.0");
+
             var body = $@"<tds:SetNetworkInterfaces>
         <tds:InterfaceToken>{interfaceToken}</tds:InterfaceToken>
         <tds:NetworkInterface>
@@ -311,9 +354,8 @@ namespace wpfhikip.Protocols.Onvif
                 <tt:Config>
                     <tt:Manual>
                         <tt:Address>{camera.NewIP}</tt:Address>
-                        <tt:PrefixLength>{CalculatePrefixLength(camera.NewMask ?? "255.255.255.0")}</tt:PrefixLength>
+                        <tt:PrefixLength>{prefixLength}</tt:PrefixLength>
                     </tt:Manual>
-                    <tt:DHCP>false</tt:DHCP>
                 </tt:Config>
             </tt:IPv4>
         </tds:NetworkInterface>
@@ -321,7 +363,6 @@ namespace wpfhikip.Protocols.Onvif
 
             return CreateAuthenticatedSoapEnvelope(body, username, password);
         }
-
         /// <summary>
         /// Creates GetNTP SOAP request
         /// </summary>
@@ -346,7 +387,48 @@ namespace wpfhikip.Protocols.Onvif
 
             return CreateAuthenticatedSoapEnvelope(body, username, password);
         }
+        /// <summary>
+        /// Creates SetNetworkDefaultGateway SOAP request
+        /// </summary>
+        public static string CreateSetNetworkDefaultGatewayRequest(string gatewayIP, string username, string password)
+        {
+            var body = $@"<tds:SetNetworkDefaultGateway>
+        <tds:IPv4Address>{gatewayIP}</tds:IPv4Address>
+    </tds:SetNetworkDefaultGateway>";
 
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
+        }
+
+        /// <summary>
+        /// Creates SetDNS SOAP request using Camera object
+        /// </summary>
+        public static string CreateSetDNSRequest(Camera camera, string username, string password)
+        {
+            var dnsManualEntries = new List<string>();
+
+            if (!string.IsNullOrEmpty(camera.NewDNS1))
+            {
+                dnsManualEntries.Add($@"<tds:DNSManual>
+            <tt:Type>IPv4</tt:Type>
+            <tt:IPv4Address>{camera.NewDNS1}</tt:IPv4Address>
+        </tds:DNSManual>");
+            }
+
+            if (!string.IsNullOrEmpty(camera.NewDNS2))
+            {
+                dnsManualEntries.Add($@"<tds:DNSManual>
+            <tt:Type>IPv4</tt:Type>
+            <tt:IPv4Address>{camera.NewDNS2}</tt:IPv4Address>
+        </tds:DNSManual>");
+            }
+
+            var body = $@"<tds:SetDNS>
+        <tds:FromDHCP>false</tds:FromDHCP>
+        {string.Join("", dnsManualEntries)}
+    </tds:SetDNS>";
+
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
+        }
         /// <summary>
         /// Extracts device information from GetDeviceInformation response
         /// </summary>

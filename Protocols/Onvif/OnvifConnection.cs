@@ -19,9 +19,6 @@ namespace wpfhikip.Protocols.Onvif
         private string? _deviceServiceUrl;
         private string? _mediaServiceUrl;
 
-        // Add debug logging flag
-        private bool _enableDetailedLogging = true; // Can be made configurable
-
         public string IpAddress { get; set; }
         public int Port { get; set; }
         public string Username { get; set; }
@@ -35,8 +32,6 @@ namespace wpfhikip.Protocols.Onvif
             Port = port;
             Username = username;
             Password = password;
-
-            LogDebug("Connection", $"Created ONVIF connection for {ipAddress}:{port} with user '{username}'");
         }
 
         public OnvifConnection(string ipAddress, int port, string username, string password, AuthenticationMode authMode)
@@ -53,63 +48,40 @@ namespace wpfhikip.Protocols.Onvif
 
             try
             {
-                LogDebug("Compatibility", "Starting ONVIF compatibility check");
-
                 InitializeHttpClient();
-                LogDebug("Compatibility", "HTTP client initialized");
 
                 var deviceServiceFound = await DiscoverDeviceServiceAsync();
                 if (!deviceServiceFound)
                 {
-                    LogDebug("Compatibility", "Device service discovery failed");
                     return ProtocolCompatibilityResult.CreateFailure("ONVIF device service not found");
                 }
 
-                LogDebug("Compatibility", $"Device service discovered at: {_deviceServiceUrl}");
-
                 // Try without authentication first
                 var deviceInfoRequest = OnvifSoapTemplates.CreateGetDeviceInformationRequest();
-                LogDebug("SOAP", $"Sending unauthenticated GetDeviceInformation request");
-
-                if (_enableDetailedLogging)
-                {
-                    LogSoapRequest("GetDeviceInformation (No Auth)", deviceInfoRequest);
-                }
-
                 var response = await SendSoapRequestAsync(_deviceServiceUrl!, deviceInfoRequest, OnvifUrl.SoapActions.GetDeviceInformation);
-
-                if (_enableDetailedLogging)
-                {
-                    LogSoapResponse("GetDeviceInformation (No Auth)", response);
-                }
 
                 // Check if the response is successful and valid
                 if (response.Success && OnvifSoapTemplates.ValidateOnvifResponse(response.Content) && !OnvifSoapTemplates.IsSoapFault(response.Content))
                 {
-                    LogDebug("Compatibility", "Device responds without authentication - ONVIF compatible");
                     return ProtocolCompatibilityResult.CreateSuccess(
                         CameraProtocol.Onvif,
                         requiresAuth: false,
                         isAuthenticated: true);
                 }
 
-                LogDebug("Compatibility", "Authentication required - testing with credentials");
-
                 // Authentication is required
                 if (!string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password))
                 {
                     var authResult = await TestAuthenticationAsync();
-                    LogDebug("Compatibility", $"Authentication test result: Success={authResult.Success}, IsAuthenticated={authResult.IsAuthenticated} - {authResult.Message}");
 
                     return ProtocolCompatibilityResult.CreateSuccess(
                         CameraProtocol.Onvif,
                         requiresAuth: true,
-                        isAuthenticated: authResult.IsAuthenticated, // THIS WAS THE BUG - was using authResult.Success instead
+                        isAuthenticated: authResult.IsAuthenticated,
                         authMessage: authResult.Message);
                 }
                 else
                 {
-                    LogDebug("Compatibility", "No credentials provided for authentication test");
                     return ProtocolCompatibilityResult.CreateSuccess(
                         CameraProtocol.Onvif,
                         requiresAuth: true,
@@ -119,7 +91,6 @@ namespace wpfhikip.Protocols.Onvif
             }
             catch (Exception ex)
             {
-                LogError("Compatibility", $"ONVIF compatibility check failed: {ex}");
                 activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 return ProtocolCompatibilityResult.CreateFailure($"ONVIF compatibility check failed: {ex.Message}");
             }
@@ -131,38 +102,22 @@ namespace wpfhikip.Protocols.Onvif
 
             try
             {
-                LogDebug("Authentication", "Starting authentication test");
-
                 if (string.IsNullOrEmpty(_deviceServiceUrl))
                 {
                     var discovered = await DiscoverDeviceServiceAsync();
                     if (!discovered)
                     {
-                        LogDebug("Authentication", "Device service not found during auth test");
                         return AuthenticationResult.CreateFailure("Device service not found");
                     }
                 }
 
                 // Test authentication with credentials
                 var deviceInfoRequest = OnvifSoapTemplates.CreateGetDeviceInformationRequest(Username, Password);
-                LogDebug("Authentication", "Sending authenticated GetDeviceInformation request");
-
-                if (_enableDetailedLogging)
-                {
-                    LogSoapRequest("GetDeviceInformation (Auth)", deviceInfoRequest);
-                }
-
                 var response = await SendSoapRequestAsync(_deviceServiceUrl!, deviceInfoRequest, OnvifUrl.SoapActions.GetDeviceInformation);
-
-                if (_enableDetailedLogging)
-                {
-                    LogSoapResponse("GetDeviceInformation (Auth)", response);
-                }
 
                 // Check for explicit authentication failure
                 if (response.StatusCode == HttpStatusCode.Unauthorized)
                 {
-                    LogDebug("Authentication", "HTTP 401 - Authentication rejected");
                     return AuthenticationResult.CreateFailure("HTTP 401: Authentication credentials rejected");
                 }
 
@@ -170,18 +125,15 @@ namespace wpfhikip.Protocols.Onvif
                 if (OnvifSoapTemplates.IsSoapFault(response.Content))
                 {
                     var faultString = OnvifSoapTemplates.ExtractSoapFaultString(response.Content);
-                    LogDebug("Authentication", $"SOAP fault received: {faultString}");
 
                     // Check if this is an authentication-related fault
                     if (IsAuthenticationFault(faultString))
                     {
-                        LogDebug("Authentication", "SOAP fault indicates authentication failure");
                         return AuthenticationResult.CreateFailure($"Authentication failed: {faultString}");
                     }
 
                     // Even non-auth faults should be considered failures for ONVIF
                     // because ONVIF typically returns faults when auth fails
-                    LogDebug("Authentication", "SOAP fault indicates request failure - treating as auth failure");
                     return AuthenticationResult.CreateFailure($"SOAP fault: {faultString}");
                 }
 
@@ -190,22 +142,18 @@ namespace wpfhikip.Protocols.Onvif
                 {
                     if (ContainsValidDeviceInfo(response.Content))
                     {
-                        LogDebug("Authentication", "Authentication successful - valid device information received");
                         return AuthenticationResult.CreateSuccess("ONVIF authentication successful");
                     }
                     else
                     {
-                        LogDebug("Authentication", "Response valid but no device information - authentication failed");
                         return AuthenticationResult.CreateFailure("Authentication failed - no valid device information returned");
                     }
                 }
 
-                LogDebug("Authentication", $"Authentication failed with status: {response.StatusCode}");
                 return AuthenticationResult.CreateFailure($"Authentication failed with status: {response.StatusCode}");
             }
             catch (Exception ex)
             {
-                LogError("Authentication", $"Authentication test error: {ex}");
                 activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 return AuthenticationResult.CreateFailure($"Authentication error: {ex.Message}");
             }
@@ -275,34 +223,28 @@ namespace wpfhikip.Protocols.Onvif
             using var activity = ActivitySource.StartActivity("DiscoverDeviceService");
 
             var possibleUrls = OnvifUrl.UrlBuilders.GetPossibleDeviceServiceUrls(IpAddress, Port);
-            LogDebug("Discovery", $"Testing {possibleUrls.Length} possible device service URLs");
 
             for (int i = 0; i < possibleUrls.Length; i++)
             {
                 var url = possibleUrls[i];
-                LogDebug("Discovery", $"Testing URL {i + 1}/{possibleUrls.Length}: {url}");
 
                 try
                 {
                     var testRequest = OnvifSoapTemplates.CreateGetSystemDateAndTimeRequest();
                     var response = await SendSoapRequestAsync(url, testRequest, OnvifUrl.SoapActions.GetSystemDateAndTime);
 
-                    LogDebug("Discovery", $"URL {url} responded with status: {response.StatusCode}, Success: {response.Success}");
-
                     if (response.Success || response.StatusCode == HttpStatusCode.Unauthorized)
                     {
                         _deviceServiceUrl = url;
-                        LogDebug("Discovery", $"Device service found at: {url}");
                         return true;
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    LogDebug("Discovery", $"URL {url} failed: {ex.Message}");
+                    // Continue to next URL
                 }
             }
 
-            LogDebug("Discovery", "No device service URL found");
             return false;
         }
 
@@ -400,26 +342,13 @@ namespace wpfhikip.Protocols.Onvif
                     content.Headers.Add("SOAPAction", soapAction);
                 }
 
-                LogDebug("HTTP", $"POST {url} with action: {soapAction}");
-
-                var stopwatch = Stopwatch.StartNew();
                 var response = await _httpClient!.PostAsync(url, content);
-                stopwatch.Stop();
-
                 var responseContent = await response.Content.ReadAsStringAsync();
-
-                LogDebug("HTTP", $"Response received in {stopwatch.ElapsedMilliseconds}ms - Status: {response.StatusCode}, Length: {responseContent.Length}");
-
-                if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.Unauthorized)
-                {
-                    LogDebug("HTTP", $"Non-success status code: {response.StatusCode}");
-                }
 
                 return (response.IsSuccessStatusCode, responseContent, response.StatusCode);
             }
             catch (Exception ex)
             {
-                LogError("HTTP", $"Request to {url} failed: {ex}");
                 activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 return (false, string.Empty, HttpStatusCode.InternalServerError);
             }
@@ -507,60 +436,10 @@ namespace wpfhikip.Protocols.Onvif
             }
         }
 
-        // Logging methods
-        private void LogDebug(string category, string message)
-        {
-            if (_enableDetailedLogging)
-            {
-                Debug.WriteLine($"[ONVIF-{category}] {IpAddress}:{Port} - {message}");
-            }
-        }
-
-        private void LogError(string category, string message)
-        {
-            Debug.WriteLine($"[ONVIF-ERROR-{category}] {IpAddress}:{Port} - {message}");
-        }
-
-        private void LogSoapRequest(string operation, string soapContent)
-        {
-            if (_enableDetailedLogging)
-            {
-                Debug.WriteLine($"[ONVIF-SOAP-REQUEST] {IpAddress}:{Port} - {operation}");
-                Debug.WriteLine($"Request XML:\n{FormatXml(soapContent)}");
-            }
-        }
-
-        private void LogSoapResponse(string operation, (bool Success, string Content, HttpStatusCode StatusCode) response)
-        {
-            if (_enableDetailedLogging)
-            {
-                Debug.WriteLine($"[ONVIF-SOAP-RESPONSE] {IpAddress}:{Port} - {operation}");
-                Debug.WriteLine($"Status: {response.StatusCode}, Success: {response.Success}, Length: {response.Content.Length}");
-                if (!string.IsNullOrEmpty(response.Content))
-                {
-                    Debug.WriteLine($"Response XML:\n{FormatXml(response.Content)}");
-                }
-            }
-        }
-
-        private static string FormatXml(string xml)
-        {
-            try
-            {
-                var doc = XDocument.Parse(xml);
-                return doc.ToString();
-            }
-            catch
-            {
-                return xml; // Return original if parsing fails
-            }
-        }
-
         public void Dispose()
         {
             if (!_disposed)
             {
-                LogDebug("Lifecycle", "Disposing ONVIF connection");
                 _httpClient?.Dispose();
                 ActivitySource.Dispose();
                 _disposed = true;

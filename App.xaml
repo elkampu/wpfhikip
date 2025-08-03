@@ -10,6 +10,7 @@
                 <ResourceDictionary Source="Resources/SECColors.xaml" />
                 <ResourceDictionary Source="Resources/Styles/NetConfStyles.xaml" />
                 <ResourceDictionary Source="Resources/Styles/SiteManagerStyles.xaml" />
+                <ResourceDictionary Source="Resources/Styles/CameraInfoDialogStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Converters -->

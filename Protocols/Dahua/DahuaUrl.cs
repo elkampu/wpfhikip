@@ -4,6 +4,7 @@
     {
         // Base endpoints
         public const string ConfigManagerBase = "/cgi-bin/configManager.cgi";
+        public const string SnapshotBase = "/cgi-bin/snapshot.cgi";
 
         // Network configuration endpoints
         public const string NetworkEth0Config = "/cgi-bin/configManager.cgi?action=getConfig&name=Network.eth0";
@@ -25,6 +26,15 @@
         public const string DeviceInfo = "/cgi-bin/configManager.cgi?action=getConfig&name=General";
         public const string SystemInfo = "/cgi-bin/configManager.cgi?action=getConfig&name=General.MachineName";
 
+        // Video streaming endpoints
+        public const string VideoConfig = "/cgi-bin/configManager.cgi?action=getConfig&name=Encode";
+        public const string VideoMainStream = "/cgi-bin/configManager.cgi?action=getConfig&name=Encode.0";
+        public const string VideoSubStream = "/cgi-bin/configManager.cgi?action=getConfig&name=Encode.1";
+
+        // Media streaming endpoints
+        public const string SnapshotChannel1 = "/cgi-bin/snapshot.cgi?channel=1";
+        public const string SnapshotChannel2 = "/cgi-bin/snapshot.cgi?channel=2";
+
         // URL Builders
         public static class UrlBuilders
         {
@@ -32,6 +42,13 @@
             {
                 var protocol = useHttps ? "https" : "http";
                 return $"{protocol}://{ipAddress}{endpoint}";
+            }
+
+            public static string BuildGetUrl(string ipAddress, string endpoint, bool useHttps, int port)
+            {
+                var protocol = useHttps ? "https" : "http";
+                var portSuffix = port is not (80 or 443) ? $":{port}" : "";
+                return $"{protocol}://{ipAddress}{portSuffix}{endpoint}";
             }
 
             public static string BuildSetConfigUrl(string ipAddress, Dictionary<string, string> parameters, bool useHttps = false)
@@ -98,6 +115,22 @@
 
                 return BuildSetConfigUrl(ipAddress, parameters, useHttps);
             }
+
+            public static string BuildSnapshotUrl(string ipAddress, int channel = 1, bool useHttps = false)
+            {
+                var protocol = useHttps ? "https" : "http";
+                return $"{protocol}://{ipAddress}{SnapshotBase}?channel={channel}";
+            }
+
+            public static string BuildRtspUrl(string ipAddress, string username, string password, int channel = 1, int subtype = 0)
+            {
+                return $"rtsp://{username}:{password}@{ipAddress}:554/cam/realmonitor?channel={channel}&subtype={subtype}";
+            }
+
+            public static string BuildRtspUrlAlternative(string ipAddress, string username, string password, int channel = 1, string streamType = "main")
+            {
+                return $"rtsp://{username}:{password}@{ipAddress}:554/live/ch{channel:D2}/{streamType}";
+            }
         }
 
         // Endpoint to HTTP Method mapping
@@ -109,7 +142,9 @@
                 { NetworkEth0IpAddress, ("GET", "GET") },
                 { NtpConfig, ("GET", "GET") },
                 { DeviceInfo, ("GET", "N/A") },
-                { SystemInfo, ("GET", "N/A") }
+                { SystemInfo, ("GET", "N/A") },
+                { VideoConfig, ("GET", "GET") },
+                { SnapshotChannel1, ("GET", "N/A") }
             };
 
             public static (string GetMethod, string SetMethod) GetMethodsForEndpoint(string endpoint)
@@ -124,6 +159,7 @@
     {
         public const string FormUrlEncoded = "application/x-www-form-urlencoded";
         public const string Text = "text/plain";
+        public const string Json = "application/json";
     }
 
     // Response Status Messages
@@ -142,5 +178,8 @@
         public const string RetrievingCurrentConfig = "Retrieving current configuration...";
         public const string ConfigRetrieved = "Configuration retrieved successfully";
         public const string ConfigRetrievalError = "Error retrieving configuration";
+        public const string DeviceNotCompatible = "Device is not a Dahua camera";
+        public const string AuthenticationRequired = "Authentication required";
+        public const string AuthenticationFailed = "Authentication failed";
     }
 }

@@ -12,305 +12,15 @@
         ResizeMode="CanResize"
         MinHeight="600"
         MinWidth="800">
+
     <Window.Resources>
-        <!-- Converters -->
-        <converters:EnumToStringConverter x:Key="EnumToStringConverter" />
-        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <!-- Add the converters -->
         <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
-
-        <!-- Modern Card Style -->
-        <Style x:Key="ModernCardStyle"
-               TargetType="Border">
-            <Setter Property="Background"
-                    Value="{StaticResource SEC_White}" />
-            <Setter Property="BorderBrush"
-                    Value="{StaticResource SEC_LightGrey}" />
-            <Setter Property="BorderThickness"
-                    Value="1" />
-            <Setter Property="CornerRadius"
-                    Value="8" />
-            <Setter Property="Padding"
-                    Value="16" />
-            <Setter Property="Margin"
-                    Value="8" />
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="8"
-                                      ShadowDepth="2"
-                                      Opacity="0.1" />
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Modern Button Styles -->
-        <Style x:Key="ModernButtonStyle"
-               TargetType="Button">
-            <Setter Property="BorderThickness"
-                    Value="0" />
-            <Setter Property="Padding"
-                    Value="12,8" />
-            <Setter Property="Margin"
-                    Value="4" />
-            <Setter Property="FontWeight"
-                    Value="Medium" />
-            <Setter Property="FontSize"
-                    Value="14" />
-            <Setter Property="Cursor"
-                    Value="Hand" />
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="4"
-                                      ShadowDepth="1"
-                                      Opacity="0.2" />
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver"
-                         Value="True">
-                    <Setter Property="Opacity"
-                            Value="0.9" />
-                </Trigger>
-                <Trigger Property="IsPressed"
-                         Value="True">
-                    <Setter Property="RenderTransform">
-                        <Setter.Value>
-                            <ScaleTransform ScaleX="0.98"
-                                            ScaleY="0.98" />
-                        </Setter.Value>
-                    </Setter>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="PrimaryButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource ModernButtonStyle}">
-            <Setter Property="Background"
-                    Value="{StaticResource SEC_MidBlue}" />
-            <Setter Property="Foreground"
-                    Value="{StaticResource SEC_White}" />
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver"
-                         Value="True">
-                    <Setter Property="Background"
-                            Value="{StaticResource SEC_LightBlue}" />
-                </Trigger>
-                <Trigger Property="IsPressed"
-                         Value="True">
-                    <Setter Property="Background"
-                            Value="{StaticResource SEC_NavyBlue}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="SuccessButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource ModernButtonStyle}">
-            <Setter Property="Background"
-                    Value="#16a34a" />
-            <Setter Property="Foreground"
-                    Value="White" />
-        </Style>
-
-        <Style x:Key="DangerButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource ModernButtonStyle}">
-            <Setter Property="Background"
-                    Value="#dc2626" />
-            <Setter Property="Foreground"
-                    Value="White" />
-        </Style>
-
-        <Style x:Key="SecondaryButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource ModernButtonStyle}">
-            <Setter Property="Background"
-                    Value="{StaticResource SEC_MidGrey}" />
-            <Setter Property="Foreground"
-                    Value="White" />
-        </Style>
-
-        <!-- Section Title Style -->
-        <Style x:Key="SectionTitleStyle"
-               TargetType="TextBlock">
-            <Setter Property="FontWeight"
-                    Value="Bold" />
-            <Setter Property="FontSize"
-                    Value="16" />
-            <Setter Property="Foreground"
-                    Value="{StaticResource SEC_DarkGrey}" />
-            <Setter Property="Margin"
-                    Value="0,0,0,12" />
-        </Style>
-
-        <!-- Stats Card Style -->
-        <Style x:Key="StatsCardStyle"
-               TargetType="Border">
-            <Setter Property="Background"
-                    Value="{StaticResource SEC_White}" />
-            <Setter Property="BorderBrush"
-                    Value="{StaticResource SEC_LightGrey}" />
-            <Setter Property="BorderThickness"
-                    Value="1" />
-            <Setter Property="CornerRadius"
-                    Value="6" />
-            <Setter Property="Padding"
-                    Value="16" />
-            <Setter Property="Margin"
-                    Value="4" />
-        </Style>
-
-        <!-- Modern Text Styles -->
-        <Style x:Key="ModernTextBlockStyle"
-               TargetType="TextBlock">
-            <Setter Property="Foreground"
-                    Value="{StaticResource SEC_DarkGrey}" />
-            <Setter Property="FontFamily"
-                    Value="Segoe UI" />
-            <Setter Property="FontSize"
-                    Value="12" />
-        </Style>
-
-        <Style x:Key="HeaderTextBlockStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource ModernTextBlockStyle}">
-            <Setter Property="FontSize"
-                    Value="24" />
-            <Setter Property="FontWeight"
-                    Value="Bold" />
-            <Setter Property="Margin"
-                    Value="0,0,0,8" />
-            <Setter Property="Foreground"
-                    Value="{StaticResource SEC_DarkGrey}" />
-        </Style>
-
-        <Style x:Key="SubHeaderTextBlockStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource ModernTextBlockStyle}">
-            <Setter Property="FontSize"
-                    Value="14" />
-            <Setter Property="Foreground"
-                    Value="{StaticResource SEC_MidGrey}" />
-            <Setter Property="Margin"
-                    Value="0,0,0,0" />
-        </Style>
-
-        <Style x:Key="SectionHeaderStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource ModernTextBlockStyle}">
-            <Setter Property="FontSize"
-                    Value="14" />
-            <Setter Property="FontWeight"
-                    Value="Bold" />
-            <Setter Property="Margin"
-                    Value="0,0,0,10" />
-            <Setter Property="Foreground"
-                    Value="{StaticResource SEC_DarkGrey}" />
-        </Style>
-
-        <Style x:Key="LabelTextBlockStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource ModernTextBlockStyle}">
-            <Setter Property="FontWeight"
-                    Value="Bold" />
-            <Setter Property="FontSize"
-                    Value="11" />
-            <Setter Property="Margin"
-                    Value="0,0,10,5" />
-            <Setter Property="VerticalAlignment"
-                    Value="Top" />
-            <Setter Property="Foreground"
-                    Value="{StaticResource SEC_MidGrey}" />
-        </Style>
-
-        <!-- Selectable Text Style for values -->
-        <Style x:Key="SelectableValueTextStyle"
-               TargetType="TextBox">
-            <Setter Property="FontSize"
-                    Value="11" />
-            <Setter Property="FontFamily"
-                    Value="Consolas" />
-            <Setter Property="Margin"
-                    Value="0,0,0,5" />
-            <Setter Property="Foreground"
-                    Value="{StaticResource SEC_DarkGrey}" />
-            <Setter Property="Background"
-                    Value="Transparent" />
-            <Setter Property="BorderThickness"
-                    Value="0" />
-            <Setter Property="IsReadOnly"
-                    Value="True" />
-            <Setter Property="IsTabStop"
-                    Value="False" />
-            <Setter Property="TextWrapping"
-                    Value="Wrap" />
-            <Setter Property="Cursor"
-                    Value="IBeam" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TextBox">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="2">
-                            <ScrollViewer x:Name="PART_ContentHost"
-                                          Background="Transparent"
-                                          Focusable="False"
-                                          HorizontalScrollBarVisibility="Hidden"
-                                          VerticalScrollBarVisibility="Hidden" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver"
-                                     Value="True">
-                                <Setter Property="Background"
-                                        Value="#f0f8ff" />
-                            </Trigger>
-                            <Trigger Property="IsFocused"
-                                     Value="True">
-                                <Setter Property="Background"
-                                        Value="#f0f8ff" />
-                                <Setter Property="BorderBrush"
-                                        Value="{StaticResource SEC_LightBlue}" />
-                                <Setter Property="BorderThickness"
-                                        Value="1" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Loading and Error Styles -->
-        <Style x:Key="LoadingStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource ModernTextBlockStyle}">
-            <Setter Property="FontSize"
-                    Value="14" />
-            <Setter Property="FontWeight"
-                    Value="Bold" />
-            <Setter Property="HorizontalAlignment"
-                    Value="Center" />
-            <Setter Property="Foreground"
-                    Value="{StaticResource SEC_MidBlue}" />
-        </Style>
-
-        <Style x:Key="ErrorStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource ModernTextBlockStyle}">
-            <Setter Property="FontSize"
-                    Value="12" />
-            <Setter Property="Foreground"
-                    Value="#dc2626" />
-            <Setter Property="TextWrapping"
-                    Value="Wrap" />
-            <Setter Property="Margin"
-                    Value="0,10,0,0" />
-        </Style>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </Window.Resources>
 
     <Grid Background="#f8fafc">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -331,23 +41,24 @@
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="{Binding IpAddress, StringFormat='Camera Information - {0}'}"
                                Style="{StaticResource HeaderTextBlockStyle}" />
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Real-time device monitoring and configuration details"
-                                   Style="{StaticResource SubHeaderTextBlockStyle}" />
-                        <Border Background="#dbeafe"
-                                Padding="6,2"
-                                CornerRadius="3"
-                                Margin="8,0,0,0">
-                            <TextBlock Text="Auto-refresh: ON (30s)"
-                                       FontSize="11"
-                                       Foreground="#1e40af"
-                                       FontWeight="Bold" />
-                        </Border>
-                    </StackPanel>
+                    <TextBlock Text="Real-time device monitoring and configuration details"
+                               Style="{StaticResource SubHeaderTextBlockStyle}" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal">
+                    <Button Content="🔄 Refresh"
+                            Command="{Binding RefreshCommand}"
+                            Style="{StaticResource SuccessButtonStyle}"
+                            Margin="0,0,8,0"
+                            Visibility="{Binding IsLoading, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
+
+                    <Button Content="⏹️ Cancel"
+                            Command="{Binding CancelCommand}"
+                            Style="{StaticResource DangerButtonStyle}"
+                            Margin="0,0,8,0"
+                            Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
                     <Button Content="📋 Copy All"
                             Command="{Binding CopyAllCommand}"
                             Style="{StaticResource SuccessButtonStyle}" />
@@ -355,103 +66,10 @@
             </Grid>
         </Border>
 
-        <!-- Status Panel -->
+        <!-- Loading Status -->
         <Border Grid.Row="1"
                 Style="{StaticResource ModernCardStyle}"
-                Margin="24,16,24,8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <!-- IP Address -->
-                <Border Grid.Column="0"
-                        Style="{StaticResource StatsCardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="IP ADDRESS"
-                                   FontSize="11"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                        <TextBox Text="{Binding IpAddress, Mode=OneWay}"
-                                 FontSize="16"
-                                 FontWeight="Bold"
-                                 FontFamily="Consolas"
-                                 Foreground="{StaticResource SEC_DarkGrey}"
-                                 Style="{StaticResource SelectableValueTextStyle}" />
-                        <TextBlock Text="Device endpoint"
-                                   FontSize="12"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Protocol -->
-                <Border Grid.Column="1"
-                        Style="{StaticResource StatsCardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="PROTOCOL"
-                                   FontSize="11"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                        <TextBox Text="{Binding Protocol, Mode=OneWay}"
-                                 FontSize="16"
-                                 FontWeight="Bold"
-                                 Foreground="#2563eb"
-                                 Style="{StaticResource SelectableValueTextStyle}" />
-                        <TextBox Text="{Binding Port, StringFormat='Port: {0}', Mode=OneWay}"
-                                 FontSize="12"
-                                 Foreground="{StaticResource SEC_MidGrey}"
-                                 Style="{StaticResource SelectableValueTextStyle}"
-                                 Margin="0" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Status -->
-                <Border Grid.Column="2"
-                        Style="{StaticResource StatsCardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="STATUS"
-                                   FontSize="11"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                        <TextBox Text="{Binding Status, Mode=OneWay}"
-                                 FontSize="16"
-                                 FontWeight="Bold"
-                                 Foreground="#16a34a"
-                                 Style="{StaticResource SelectableValueTextStyle}" />
-                        <TextBlock Text="Connection state"
-                                   FontSize="12"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                    </StackPanel>
-                </Border>
-
-                <!-- User -->
-                <Border Grid.Column="3"
-                        Style="{StaticResource StatsCardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="USERNAME"
-                                   FontSize="11"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                        <TextBox Text="{Binding Username, Mode=OneWay}"
-                                 FontSize="16"
-                                 FontWeight="Bold"
-                                 Foreground="#7c3aed"
-                                 Style="{StaticResource SelectableValueTextStyle}" />
-                        <TextBlock Text="Authentication user"
-                                   FontSize="12"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </Border>
-
-        <!-- Loading Status -->
-        <Border Grid.Row="2"
-                Style="{StaticResource ModernCardStyle}"
-                Margin="24,8,24,8"
+                Margin="24,16,24,8"
                 Background="#dbeafe"
                 BorderBrush="#3b82f6"
                 Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -485,9 +103,9 @@
         </Border>
 
         <!-- Error Message -->
-        <Border Grid.Row="2"
+        <Border Grid.Row="1"
                 Style="{StaticResource ModernCardStyle}"
-                Margin="24,8,24,8"
+                Margin="24,16,24,8"
                 Background="#fee2e2"
                 BorderBrush="#ef4444"
                 Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -502,7 +120,7 @@
         </Border>
 
         <!-- Main Content -->
-        <Grid Grid.Row="3"
+        <Grid Grid.Row="2"
               Margin="24,8,24,16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -806,7 +424,7 @@
         </Grid>
 
         <!-- Action Bar -->
-        <Border Grid.Row="4"
+        <Border Grid.Row="3"
                 Background="{StaticResource SEC_White}"
                 BorderBrush="{StaticResource SEC_LightGrey}"
                 BorderThickness="0,1,0,0">
@@ -851,7 +469,7 @@
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Setter Property="Text"
-                                        Value="Ready - Auto-refreshing every 30 seconds" />
+                                        Value="Ready - Use refresh button to update information" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsLoading}"
                                                  Value="True">
@@ -871,18 +489,6 @@
 
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal">
-                    <!-- Cancel Button - Only visible when loading -->
-                    <Button Content="⏹️ Cancel"
-                            Command="{Binding CancelCommand}"
-                            Style="{StaticResource DangerButtonStyle}"
-                            Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
-
-                    <!-- Refresh Button - Only visible when NOT loading -->
-                    <Button Content="🔄 Refresh"
-                            Command="{Binding RefreshCommand}"
-                            Style="{StaticResource SuccessButtonStyle}"
-                            Visibility="{Binding IsLoading, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
-
                     <Button Content="❌ Close"
                             Click="CloseButton_Click"
                             Style="{StaticResource PrimaryButtonStyle}" />

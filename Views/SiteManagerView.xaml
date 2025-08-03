@@ -22,19 +22,9 @@
         <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
         <converters:EnumToStringConverter x:Key="EnumToStringConverter" />
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-
-        <!-- Dropdown Menu Button Style -->
-        <Style x:Key="DropdownMenuButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource SecondaryButtonStyle}">
-            <Setter Property="Content"
-                    Value="⚙️ Actions ▼" />
-            <Setter Property="Width"
-                    Value="90" />
-        </Style>
     </Window.Resources>
 
-    <Grid Background="#f8fafc">
+    <Grid Style="{StaticResource MainBackgroundStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -43,9 +33,7 @@
 
         <!-- Header -->
         <Border Grid.Row="0"
-                Background="{StaticResource SEC_White}"
-                BorderBrush="{StaticResource SEC_LightGrey}"
-                BorderThickness="0,0,0,1">
+                Style="{StaticResource HeaderBorderStyle}">
             <Grid Margin="24,16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -54,13 +42,9 @@
 
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Site Manager"
-                               FontSize="28"
-                               FontWeight="Bold"
-                               Foreground="{StaticResource SEC_DarkGrey}" />
+                               Style="{StaticResource HeaderTitleStyle}" />
                     <TextBlock Text="Manage clients, sites, and their network devices"
-                               FontSize="14"
-                               Foreground="{StaticResource SEC_MidGrey}"
-                               Margin="0,4,0,0" />
+                               Style="{StaticResource HeaderSubtitleStyle}" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1"
@@ -120,18 +104,10 @@
                     <ListBox Grid.Row="2"
                              ItemsSource="{Binding Clients}"
                              SelectedItem="{Binding SelectedClient}"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                             Style="{StaticResource TransparentListBoxStyle}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="White"
-                                        BorderBrush="{StaticResource SEC_LightGrey}"
-                                        BorderThickness="1"
-                                        CornerRadius="4"
-                                        Margin="0,2"
-                                        Padding="12,8">
-
+                                <Border Style="{StaticResource ClientListItemStyle}">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
@@ -141,14 +117,10 @@
 
                                         <TextBlock Grid.Row="0"
                                                    Text="{Binding Name}"
-                                                   FontWeight="SemiBold"
-                                                   FontSize="14"
-                                                   Foreground="{StaticResource SEC_DarkGrey}" />
+                                                   Style="{StaticResource ClientNameTextStyle}" />
 
                                         <TextBlock Grid.Row="2"
-                                                   FontSize="11"
-                                                   Foreground="{StaticResource SEC_MidGrey}"
-                                                   Margin="0,4,0,0">
+                                                   Style="{StaticResource ClientInfoTextStyle}">
                                             <Run Text="{Binding SiteCount, Mode=OneWay}" />
                                             <Run Text="sites," />
                                             <Run Text="{Binding TotalDeviceCount, Mode=OneWay}" />
@@ -162,19 +134,18 @@
 
                     <!-- Client Actions -->
                     <StackPanel Grid.Row="3"
-                                Orientation="Horizontal"
-                                Margin="0,12,0,0">
+                                Style="{StaticResource ActionButtonPanelStyle}">
                         <Button Content="➕ Add"
                                 Command="{Binding AddClientCommand}"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Width="100" />
+                                Style="{StaticResource CompactPrimaryButtonStyle}"
+                                Width="90" />
 
                         <!-- Client Actions Dropdown -->
                         <Button x:Name="ClientActionsButton"
                                 Style="{StaticResource DropdownMenuButtonStyle}"
                                 Click="ClientActionsButton_Click"
                                 IsEnabled="{Binding IsClientSelected}"
-                                Width="120">
+                                Width="90">
                             <Button.ContextMenu>
                                 <ContextMenu x:Name="ClientActionsMenu">
                                     <MenuItem Header="✏️ Edit Client"
@@ -228,19 +199,11 @@
                     <ListBox Grid.Row="2"
                              ItemsSource="{Binding Sites}"
                              SelectedItem="{Binding SelectedSite}"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             Style="{StaticResource TransparentListBoxStyle}"
                              IsEnabled="{Binding IsClientSelected}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="White"
-                                        BorderBrush="{StaticResource SEC_LightGrey}"
-                                        BorderThickness="1"
-                                        CornerRadius="4"
-                                        Margin="0,2"
-                                        Padding="12,8">
-
+                                <Border Style="{StaticResource SiteListItemStyle}">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
@@ -251,15 +214,11 @@
 
                                         <TextBlock Grid.Row="0"
                                                    Text="{Binding Name}"
-                                                   FontWeight="SemiBold"
-                                                   FontSize="14"
-                                                   Foreground="{StaticResource SEC_DarkGrey}" />
+                                                   Style="{StaticResource SiteNameTextStyle}" />
                                         <TextBlock Grid.Row="3"
-                                                   FontSize="11"
-                                                   Foreground="{StaticResource SEC_MidGrey}"
-                                                   Margin="0,4,0,0">
-    <Run Text="{Binding DeviceCount, Mode=OneWay}" />
-    <Run Text="devices" />
+                                                   Style="{StaticResource SiteInfoTextStyle}">
+                                            <Run Text="{Binding DeviceCount, Mode=OneWay}" />
+                                            <Run Text="devices" />
                                         </TextBlock>
                                     </Grid>
                                 </Border>
@@ -269,19 +228,18 @@
 
                     <!-- Site Actions -->
                     <StackPanel Grid.Row="3"
-                                Orientation="Horizontal"
-                                Margin="0,12,0,0">
+                                Style="{StaticResource ActionButtonPanelStyle}">
                         <Button Content="➕ Add"
                                 Command="{Binding AddSiteCommand}"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Width="100" />
+                                Style="{StaticResource CompactPrimaryButtonStyle}"
+                                Width="90" />
 
                         <!-- Site Actions Dropdown -->
                         <Button x:Name="SiteActionsButton"
                                 Style="{StaticResource DropdownMenuButtonStyle}"
                                 Click="SiteActionsButton_Click"
                                 IsEnabled="{Binding IsSiteSelected}"
-                                Width="120">
+                                Width="90">
                             <Button.ContextMenu>
                                 <ContextMenu x:Name="SiteActionsMenu">
                                     <MenuItem Header="✏️ Edit Site"
@@ -344,10 +302,8 @@
                                   ItemsSource="{Binding SiteDevices, Mode=OneWay}"
                                   IsEnabled="{Binding IsSiteSelected}">
                             <DataGrid.RowStyle>
-                                <Style TargetType="DataGridRow">
-                                    <Setter Property="Background"
-                                            Value="{Binding CellColor}" />
-                                </Style>
+                                <Style TargetType="DataGridRow"
+                                       BasedOn="{StaticResource SiteManagerDataGridRowStyle}" />
                             </DataGrid.RowStyle>
                             <DataGrid.Columns>
                                 <!-- Select Column -->
@@ -372,9 +328,7 @@
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding Protocol, Converter={StaticResource EnumToStringConverter}}"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       FontSize="12" />
+                                                       Style="{StaticResource DataGridCellTextStyle}" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                     <DataGridTemplateColumn.CellEditingTemplate>
@@ -402,9 +356,7 @@
                                         <DataTemplate>
                                             <TextBlock Text="{Binding CurrentIP}"
                                                        FontWeight="{Binding CellFontWeight}"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       FontSize="12" />
+                                                       Style="{StaticResource DataGridCellTextStyle}" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                     <DataGridTemplateColumn.CellEditingTemplate>
@@ -421,24 +373,12 @@
                                                     MaxWidth="80"
                                                     Binding="{Binding Port}">
                                     <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="HorizontalAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="VerticalAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="FontSize"
-                                                    Value="12" />
-                                        </Style>
+                                        <Style TargetType="TextBlock"
+                                               BasedOn="{StaticResource DataGridCellTextStyle}" />
                                     </DataGridTextColumn.ElementStyle>
                                     <DataGridTextColumn.EditingElementStyle>
-                                        <Style TargetType="TextBox">
-                                            <Setter Property="HorizontalContentAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="VerticalContentAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="FontSize"
-                                                    Value="12" />
-                                        </Style>
+                                        <Style TargetType="TextBox"
+                                               BasedOn="{StaticResource DataGridCellTextBoxStyle}" />
                                     </DataGridTextColumn.EditingElementStyle>
                                 </DataGridTextColumn>
 
@@ -449,24 +389,12 @@
                                                     MaxWidth="80"
                                                     Binding="{Binding Username}">
                                     <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="HorizontalAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="VerticalAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="FontSize"
-                                                    Value="12" />
-                                        </Style>
+                                        <Style TargetType="TextBlock"
+                                               BasedOn="{StaticResource DataGridCellTextStyle}" />
                                     </DataGridTextColumn.ElementStyle>
                                     <DataGridTextColumn.EditingElementStyle>
-                                        <Style TargetType="TextBox">
-                                            <Setter Property="HorizontalContentAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="VerticalContentAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="FontSize"
-                                                    Value="12" />
-                                        </Style>
+                                        <Style TargetType="TextBox"
+                                               BasedOn="{StaticResource DataGridCellTextBoxStyle}" />
                                     </DataGridTextColumn.EditingElementStyle>
                                 </DataGridTextColumn>
 
@@ -477,24 +405,12 @@
                                                     MaxWidth="80"
                                                     Binding="{Binding Password}">
                                     <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="HorizontalAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="VerticalAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="FontSize"
-                                                    Value="12" />
-                                        </Style>
+                                        <Style TargetType="TextBlock"
+                                               BasedOn="{StaticResource DataGridCellTextStyle}" />
                                     </DataGridTextColumn.ElementStyle>
                                     <DataGridTextColumn.EditingElementStyle>
-                                        <Style TargetType="TextBox">
-                                            <Setter Property="HorizontalContentAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="VerticalContentAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="FontSize"
-                                                    Value="12" />
-                                        </Style>
+                                        <Style TargetType="TextBox"
+                                               BasedOn="{StaticResource DataGridCellTextBoxStyle}" />
                                     </DataGridTextColumn.EditingElementStyle>
                                 </DataGridTextColumn>
 
@@ -506,14 +422,8 @@
                                                     IsReadOnly="True"
                                                     Binding="{Binding Manufacturer}">
                                     <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="HorizontalAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="VerticalAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="FontSize"
-                                                    Value="12" />
-                                        </Style>
+                                        <Style TargetType="TextBlock"
+                                               BasedOn="{StaticResource DataGridCellTextStyle}" />
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
 
@@ -525,14 +435,8 @@
                                                     IsReadOnly="True"
                                                     Binding="{Binding Model}">
                                     <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="HorizontalAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="VerticalAlignment"
-                                                    Value="Center" />
-                                            <Setter Property="FontSize"
-                                                    Value="12" />
-                                        </Style>
+                                        <Style TargetType="TextBlock"
+                                               BasedOn="{StaticResource DataGridCellTextStyle}" />
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
 
@@ -560,9 +464,7 @@
 
         <!-- Action Bar -->
         <Border Grid.Row="2"
-                Background="{StaticResource SEC_White}"
-                BorderBrush="{StaticResource SEC_LightGrey}"
-                BorderThickness="0,1,0,0">
+                Style="{StaticResource ActionBarBorderStyle}">
             <Grid Margin="24,16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />

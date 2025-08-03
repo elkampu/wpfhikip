@@ -9,6 +9,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Resources/SECColors.xaml" />
                 <ResourceDictionary Source="Resources/Styles/NetConfStyles.xaml" />
+                <ResourceDictionary Source="Resources/Styles/SiteManagerStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Converters -->

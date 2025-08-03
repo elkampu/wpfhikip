@@ -60,6 +60,7 @@
 
 	<ItemGroup>
 	  <Folder Include="Properties\" />
+	  <Folder Include="Resources\Themes\" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -465,7 +465,7 @@ namespace wpfhikip.ViewModels
             return new Camera
             {
                 Protocol = CameraProtocol.Auto,
-                Connection = new CameraConnection { Port = "80" },
+                Connection = new CameraConnection { Port = "80", Username = "admin" },
                 Settings = new CameraSettings(),
                 VideoStream = new CameraVideoStream()
             };

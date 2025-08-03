@@ -15,6 +15,7 @@ namespace wpfhikip.Models
         private string? _macAddress;
         private string? _status;
         private Brush? _cellColor;
+        private FontWeight _cellFontWeight = FontWeights.Normal;
         private bool _isCompleted;
         private CameraProtocol _protocol;
         private bool _isCompatible;
@@ -131,6 +132,13 @@ namespace wpfhikip.Models
         {
             get => _cellColor;
             set => SetProperty(ref _cellColor, value);
+        }
+
+        [JsonIgnore]
+        public FontWeight CellFontWeight
+        {
+            get => _cellFontWeight;
+            set => SetProperty(ref _cellFontWeight, value);
         }
 
 

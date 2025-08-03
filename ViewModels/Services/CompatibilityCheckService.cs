@@ -117,9 +117,9 @@ namespace wpfhikip.ViewModels.Services
             }
         }
 
-        private static void SetFinalDeviceStatus(Camera device, ProtocolCompatibilityResult result)
+        private static async void SetFinalDeviceStatus(Camera device, ProtocolCompatibilityResult result)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            await Application.Current.Dispatcher.InvokeAsync(async () =>
             {
                 if (result.IsCompatible)
                 {
@@ -127,6 +127,37 @@ namespace wpfhikip.ViewModels.Services
                     device.CellColor = Brushes.LightGreen;
                     device.IsCompatible = true;
                     device.Protocol = result.DetectedProtocol;
+                    device.RequiresAuthentication = result.RequiresAuthentication;
+                    device.IsAuthenticated = result.IsAuthenticated;
+
+                    // Retrieve device information (model and manufacturer) after successful compatibility check
+                    try
+                    {
+                        device.AddProtocolLog("System", "Device Info",
+                            "Retrieving device information after successful compatibility check...");
+
+                        // Load device information to get model and manufacturer
+                        var infoLoaded = await ProtocolManager.LoadCameraInfoAsync(device, CancellationToken.None);
+
+                        if (infoLoaded)
+                        {
+                            device.AddProtocolLog("System", "Device Info",
+                                $"Successfully retrieved device info - Manufacturer: {device.Manufacturer ?? "Unknown"}, Model: {device.Model ?? "Unknown"}",
+                                ProtocolLogLevel.Success);
+                        }
+                        else
+                        {
+                            device.AddProtocolLog("System", "Device Info",
+                                "Failed to retrieve complete device information",
+                                ProtocolLogLevel.Warning);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        device.AddProtocolLog("System", "Device Info Error",
+                            $"Error retrieving device information: {ex.Message}",
+                            ProtocolLogLevel.Error);
+                    }
                 }
                 else
                 {

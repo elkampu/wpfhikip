@@ -264,6 +264,9 @@ namespace wpfhikip.Protocols.Onvif
         {
             try
             {
+                // Ensure HTTP client is initialized
+                InitializeHttpClient();
+
                 // Use proper ONVIF content type
                 var content = new StringContent(soapRequest, Encoding.UTF8, "text/xml");
                 content.Headers.Remove("Content-Type");

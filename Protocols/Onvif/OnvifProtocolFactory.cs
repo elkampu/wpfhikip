@@ -22,7 +22,7 @@ namespace wpfhikip.Protocols.Onvif
                 throw new ArgumentException($"Expected OnvifConnection, got {connection.GetType().Name}", nameof(connection));
             }
 
-            return new OnvifConfigurationAdapter(onvifConnection);
+            return new OnvifConfiguration(onvifConnection);
         }
 
         public IProtocolOperation CreateOperation(IProtocolConnection connection)

@@ -113,14 +113,19 @@ namespace wpfhikip.Protocols.Onvif
                 "onvif.org",
                 "tds:",
                 "tt:",
+                "trt:",
                 "GetDeviceInformationResponse",
                 "GetCapabilitiesResponse",
                 "GetSystemDateAndTimeResponse",
+                "GetNetworkInterfacesResponse",
+                "GetProfilesResponse",
+                "GetVideoEncoderConfigurationResponse",
                 "soap:Envelope",
                 "s:Envelope",
                 "env:Envelope",
                 "xmlns:tds",
                 "xmlns:tt",
+                "xmlns:trt",
                 "xmlns:ter"
             };
 
@@ -140,6 +145,7 @@ namespace wpfhikip.Protocols.Onvif
             return $@"<?xml version=""1.0"" encoding=""utf-8""?>
 <soap:Envelope xmlns:soap=""http://schemas.xmlsoap.org/soap/"" 
                xmlns:tds=""http://www.onvif.org/ver10/device/wsdl""
+               xmlns:trt=""http://www.onvif.org/ver10/media/wsdl""
                xmlns:tt=""http://www.onvif.org/ver10/schema"">
     <soap:Header>
         <wsse:Security xmlns:wsse=""http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd""
@@ -166,6 +172,7 @@ namespace wpfhikip.Protocols.Onvif
             return $@"<?xml version=""1.0"" encoding=""utf-8""?>
 <soap:Envelope xmlns:soap=""http://schemas.xmlsoap.org/soap/"" 
                xmlns:tds=""http://www.onvif.org/ver10/device/wsdl""
+               xmlns:trt=""http://www.onvif.org/ver10/media/wsdl""
                xmlns:tt=""http://www.onvif.org/ver10/schema"">
     <soap:Body>
         {body}
@@ -227,11 +234,66 @@ namespace wpfhikip.Protocols.Onvif
         }
 
         /// <summary>
+        /// Creates GetProfiles SOAP request for Media Service
+        /// </summary>
+        public static string CreateGetProfilesRequest(string username, string password)
+        {
+            var body = "<trt:GetProfiles/>";
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
+        }
+
+        /// <summary>
+        /// Creates GetVideoEncoderConfiguration SOAP request for Media Service
+        /// </summary>
+        public static string CreateGetVideoEncoderConfigurationRequest(string configurationToken, string username, string password)
+        {
+            var body = $@"<trt:GetVideoEncoderConfiguration>
+                <trt:ConfigurationToken>{configurationToken}</trt:ConfigurationToken>
+            </trt:GetVideoEncoderConfiguration>";
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
+        }
+
+        /// <summary>
+        /// Creates GetStreamUri SOAP request for Media Service
+        /// </summary>
+        public static string CreateGetStreamUriRequest(string profileToken, string username, string password)
+        {
+            var body = $@"<trt:GetStreamUri>
+                <trt:StreamSetup>
+                    <tt:Stream>RTP-Unicast</tt:Stream>
+                    <tt:Transport>
+                        <tt:Protocol>RTSP</tt:Protocol>
+                    </tt:Transport>
+                </trt:StreamSetup>
+                <trt:ProfileToken>{profileToken}</trt:ProfileToken>
+            </trt:GetStreamUri>";
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
+        }
+
+        /// <summary>
         /// Creates GetNetworkInterfaces SOAP request
         /// </summary>
         public static string CreateGetNetworkInterfacesRequest(string username, string password)
         {
             var body = "<tds:GetNetworkInterfaces/>";
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
+        }
+
+        /// <summary>
+        /// Creates GetDNS SOAP request
+        /// </summary>
+        public static string CreateGetDNSRequest(string username, string password)
+        {
+            var body = "<tds:GetDNS/>";
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
+        }
+
+        /// <summary>
+        /// Creates GetNetworkDefaultGateway SOAP request
+        /// </summary>
+        public static string CreateGetNetworkDefaultGatewayRequest(string username, string password)
+        {
+            var body = "<tds:GetNetworkDefaultGateway/>";
             return CreateAuthenticatedSoapEnvelope(body, username, password);
         }
 
@@ -312,20 +374,286 @@ namespace wpfhikip.Protocols.Onvif
         }
 
         /// <summary>
-        /// Extracts network interface information from GetNetworkInterfaces response
+        /// Extracts comprehensive network information from GetNetworkInterfaces response
+        /// </summary>
+        public static Dictionary<string, string> ExtractNetworkInfo(string soapResponse)
+        {
+            var networkInfo = new Dictionary<string, string>();
+            try
+            {
+                var doc = XDocument.Parse(soapResponse);
+
+                // Find network interfaces
+                var networkInterfaces = doc.Descendants().Where(e => e.Name.LocalName == "NetworkInterfaces");
+
+                foreach (var networkInterface in networkInterfaces)
+                {
+                    // Get interface token (useful for configuration)
+                    var token = networkInterface.Attribute("token")?.Value;
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        networkInfo["interfaceToken"] = token;
+                    }
+
+                    // Extract interface info
+                    var infoElement = networkInterface.Descendants().FirstOrDefault(e => e.Name.LocalName == "Info");
+                    if (infoElement != null)
+                    {
+                        var nameElement = infoElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "Name");
+                        if (nameElement != null)
+                        {
+                            networkInfo["interfaceName"] = nameElement.Value;
+                        }
+
+                        var hwAddressElement = infoElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "HwAddress");
+                        if (hwAddressElement != null)
+                        {
+                            networkInfo["macAddress"] = hwAddressElement.Value;
+                        }
+                    }
+
+                    // Extract IPv4 configuration
+                    var ipv4Element = networkInterface.Descendants().FirstOrDefault(e => e.Name.LocalName == "IPv4");
+                    if (ipv4Element != null)
+                    {
+                        var enabledElement = ipv4Element.Descendants().FirstOrDefault(e => e.Name.LocalName == "Enabled");
+                        if (enabledElement != null)
+                        {
+                            networkInfo["ipv4Enabled"] = enabledElement.Value;
+                        }
+
+                        var configElement = ipv4Element.Descendants().FirstOrDefault(e => e.Name.LocalName == "Config");
+                        if (configElement != null)
+                        {
+                            // Manual configuration
+                            var manualElement = configElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "Manual");
+                            if (manualElement != null)
+                            {
+                                var addressElement = manualElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "Address");
+                                if (addressElement != null)
+                                {
+                                    networkInfo["currentIp"] = addressElement.Value;
+                                }
+
+                                var prefixLengthElement = manualElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "PrefixLength");
+                                if (prefixLengthElement != null)
+                                {
+                                    var prefixLength = int.Parse(prefixLengthElement.Value);
+                                    networkInfo["subnetMask"] = ConvertPrefixLengthToSubnetMask(prefixLength);
+                                    networkInfo["prefixLength"] = prefixLengthElement.Value;
+                                }
+                            }
+
+                            // DHCP configuration
+                            var dhcpElement = configElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "DHCP");
+                            if (dhcpElement != null)
+                            {
+                                networkInfo["dhcpEnabled"] = dhcpElement.Value;
+                            }
+                        }
+                    }
+
+                    // Only process first interface for now
+                    break;
+                }
+            }
+            catch (Exception)
+            {
+                // Handle parsing error
+            }
+            return networkInfo;
+        }
+
+        /// <summary>
+        /// Extracts DNS information from GetDNS response
+        /// </summary>
+        public static Dictionary<string, string> ExtractDNSInfo(string soapResponse)
+        {
+            var dnsInfo = new Dictionary<string, string>();
+            try
+            {
+                var doc = XDocument.Parse(soapResponse);
+
+                var dnsResponse = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "GetDNSResponse");
+                if (dnsResponse != null)
+                {
+                    var dnsInformation = dnsResponse.Descendants().FirstOrDefault(e => e.Name.LocalName == "DNSInformation");
+                    if (dnsInformation != null)
+                    {
+                        // From DHCP
+                        var fromDhcpElement = dnsInformation.Descendants().FirstOrDefault(e => e.Name.LocalName == "FromDHCP");
+                        if (fromDhcpElement != null)
+                        {
+                            dnsInfo["dnsFromDhcp"] = fromDhcpElement.Value;
+                        }
+
+                        // Manual DNS servers
+                        var dnsManualElements = dnsInformation.Descendants().Where(e => e.Name.LocalName == "DNSManual");
+                        int dnsIndex = 1;
+                        foreach (var dnsManual in dnsManualElements)
+                        {
+                            var typeElement = dnsManual.Descendants().FirstOrDefault(e => e.Name.LocalName == "Type");
+                            var ipv4AddressElement = dnsManual.Descendants().FirstOrDefault(e => e.Name.LocalName == "IPv4Address");
+
+                            if (typeElement?.Value == "IPv4" && ipv4AddressElement != null)
+                            {
+                                dnsInfo[$"dns{dnsIndex}"] = ipv4AddressElement.Value;
+                                dnsIndex++;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Handle parsing error
+            }
+            return dnsInfo;
+        }
+
+        /// <summary>
+        /// Extracts gateway information from GetNetworkDefaultGateway response
+        /// </summary>
+        public static Dictionary<string, string> ExtractGatewayInfo(string soapResponse)
+        {
+            var gatewayInfo = new Dictionary<string, string>();
+            try
+            {
+                var doc = XDocument.Parse(soapResponse);
+
+                var gatewayResponse = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "GetNetworkDefaultGatewayResponse");
+                if (gatewayResponse != null)
+                {
+                    var networkGatewayElements = gatewayResponse.Descendants().Where(e => e.Name.LocalName == "NetworkGateway");
+
+                    foreach (var networkGateway in networkGatewayElements)
+                    {
+                        var ipv4AddressElement = networkGateway.Descendants().FirstOrDefault(e => e.Name.LocalName == "IPv4Address");
+                        if (ipv4AddressElement != null)
+                        {
+                            gatewayInfo["defaultGateway"] = ipv4AddressElement.Value;
+                            break; // Use first gateway
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Handle parsing error
+            }
+            return gatewayInfo;
+        }
+
+        /// <summary>
+        /// Extracts media profiles from GetProfiles response
+        /// </summary>
+        public static List<MediaProfile> ExtractMediaProfiles(string soapResponse)
+        {
+            var profiles = new List<MediaProfile>();
+            try
+            {
+                var doc = XDocument.Parse(soapResponse);
+
+                var profileElements = doc.Descendants().Where(e => e.Name.LocalName == "Profiles");
+                foreach (var profileElement in profileElements)
+                {
+                    var profile = new MediaProfile();
+
+                    // Get profile token
+                    profile.Token = profileElement.Attribute("token")?.Value ?? "";
+
+                    // Get profile name
+                    var nameElement = profileElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "Name");
+                    profile.Name = nameElement?.Value ?? "";
+
+                    // Extract video encoder configuration
+                    var videoEncoderConfig = profileElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "VideoEncoderConfiguration");
+                    if (videoEncoderConfig != null)
+                    {
+                        profile.VideoEncoderToken = videoEncoderConfig.Attribute("token")?.Value ?? "";
+
+                        var encodingElement = videoEncoderConfig.Descendants().FirstOrDefault(e => e.Name.LocalName == "Encoding");
+                        profile.Encoding = encodingElement?.Value ?? "";
+
+                        var resolutionElement = videoEncoderConfig.Descendants().FirstOrDefault(e => e.Name.LocalName == "Resolution");
+                        if (resolutionElement != null)
+                        {
+                            var widthElement = resolutionElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "Width");
+                            var heightElement = resolutionElement.Descendants().FirstOrDefault(e => e.Name.LocalName == "Height");
+
+                            if (widthElement != null && heightElement != null)
+                            {
+                                profile.Resolution = $"{widthElement.Value}x{heightElement.Value}";
+                            }
+                        }
+
+                        var frameRateElement = videoEncoderConfig.Descendants().FirstOrDefault(e => e.Name.LocalName == "FrameRateLimit");
+                        profile.FrameRate = frameRateElement?.Value ?? "";
+
+                        var bitrateElement = videoEncoderConfig.Descendants().FirstOrDefault(e => e.Name.LocalName == "BitrateLimit");
+                        profile.BitRate = bitrateElement?.Value ?? "";
+
+                        var qualityElement = videoEncoderConfig.Descendants().FirstOrDefault(e => e.Name.LocalName == "Quality");
+                        profile.Quality = qualityElement?.Value ?? "";
+
+                        var govLengthElement = videoEncoderConfig.Descendants().FirstOrDefault(e => e.Name.LocalName == "GovLength");
+                        profile.GovLength = govLengthElement?.Value ?? "";
+                    }
+
+                    profiles.Add(profile);
+                }
+            }
+            catch (Exception)
+            {
+                // Handle parsing error
+            }
+            return profiles;
+        }
+
+        /// <summary>
+        /// Extracts stream URI from GetStreamUri response
+        /// </summary>
+        public static string ExtractStreamUri(string soapResponse)
+        {
+            try
+            {
+                var doc = XDocument.Parse(soapResponse);
+                var uriElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "Uri");
+                return uriElement?.Value ?? "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        /// <summary>
+        /// Extracts network interface token from GetNetworkInterfaces response
         /// </summary>
         public static string ExtractNetworkInterfaceToken(string soapResponse)
         {
             try
             {
                 var doc = XDocument.Parse(soapResponse);
-                var tokenElement = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "token");
-                return tokenElement?.Value ?? "eth0"; // Default fallback
+                var networkInterface = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "NetworkInterfaces");
+                return networkInterface?.Attribute("token")?.Value ?? "eth0"; // Default fallback
             }
             catch
             {
                 return "eth0"; // Default fallback
             }
+        }
+
+        /// <summary>
+        /// Converts CIDR prefix length to subnet mask
+        /// </summary>
+        public static string ConvertPrefixLengthToSubnetMask(int prefixLength)
+        {
+            if (prefixLength < 0 || prefixLength > 32)
+                return "255.255.255.0"; // Default fallback
+
+            uint mask = 0xFFFFFFFF << (32 - prefixLength);
+            return $"{(mask >> 24) & 0xFF}.{(mask >> 16) & 0xFF}.{(mask >> 8) & 0xFF}.{mask & 0xFF}";
         }
 
         /// <summary>
@@ -407,5 +735,21 @@ namespace wpfhikip.Protocols.Onvif
             var currentNtpServer = currentConfig.GetValueOrDefault("IPv4Address", "");
             return !string.IsNullOrEmpty(camera.NewNTPServer) && currentNtpServer != camera.NewNTPServer;
         }
+    }
+
+    /// <summary>
+    /// Represents an ONVIF media profile with video configuration
+    /// </summary>
+    public sealed class MediaProfile
+    {
+        public string Token { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string VideoEncoderToken { get; set; } = string.Empty;
+        public string Encoding { get; set; } = string.Empty;
+        public string Resolution { get; set; } = string.Empty;
+        public string FrameRate { get; set; } = string.Empty;
+        public string BitRate { get; set; } = string.Empty;
+        public string Quality { get; set; } = string.Empty;
+        public string GovLength { get; set; } = string.Empty;
     }
 }

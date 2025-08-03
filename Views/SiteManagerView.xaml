@@ -440,7 +440,7 @@
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
 
-                                <!-- Status Column -->
+                                <!-- Status Column with Device Info Button -->
                                 <DataGridTemplateColumn Header="Status"
                                                         Width="120"
                                                         MinWidth="120"
@@ -451,7 +451,11 @@
                                             <Button Content="{Binding ShortStatus}"
                                                     Style="{StaticResource StatusButtonStyle}"
                                                     HorizontalAlignment="Stretch"
-                                                    VerticalAlignment="Stretch" />
+                                                    VerticalAlignment="Stretch"
+                                                    IsEnabled="{Binding CanShowCameraInfo}"
+                                                    Tag="{Binding}"
+                                                    Click="DeviceInfoButton_Click"
+                                                    ToolTip="{Binding ToolTipText}" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>

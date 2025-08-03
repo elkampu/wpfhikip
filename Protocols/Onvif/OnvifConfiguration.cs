@@ -1,11 +1,12 @@
 using wpfhikip.Models;
+using wpfhikip.Protocols.Common;
 
 namespace wpfhikip.Protocols.Onvif
 {
     /// <summary>
-    /// Configuration management for ONVIF cameras
+    /// Configuration management for ONVIF cameras with enhanced network information retrieval
     /// </summary>
-    public sealed class OnvifConfiguration : IDisposable
+    public sealed class OnvifConfiguration : IProtocolConfiguration
     {
         private readonly OnvifConnection _connection;
         private bool _disposed;
@@ -18,195 +19,252 @@ namespace wpfhikip.Protocols.Onvif
         /// <summary>
         /// Gets device information from the ONVIF camera
         /// </summary>
-        public async Task<(bool Success, Dictionary<string, object> DeviceInfo, string ErrorMessage)> GetDeviceInfoAsync()
+        public async Task<ProtocolOperationResult<Dictionary<string, object>>> GetDeviceInfoAsync(CancellationToken cancellationToken = default)
         {
             try
             {
                 var deviceInfoRequest = OnvifSoapTemplates.CreateGetDeviceInformationRequest(_connection.Username, _connection.Password);
-                var response = await SendSoapRequestAsync(deviceInfoRequest, OnvifUrl.SoapActions.GetDeviceInformation);
+                var response = await _connection.SendSoapToDeviceServiceAsync(deviceInfoRequest, OnvifUrl.SoapActions.GetDeviceInformation);
 
                 if (!response.Success)
                 {
-                    return (false, new Dictionary<string, object>(), $"Failed to get device info: {response.StatusCode}");
+                    return ProtocolOperationResult<Dictionary<string, object>>.CreateFailure($"Failed to get device info: {response.StatusCode}");
                 }
 
                 if (OnvifSoapTemplates.IsSoapFault(response.Content))
                 {
                     var faultString = OnvifSoapTemplates.ExtractSoapFaultString(response.Content);
-                    return (false, new Dictionary<string, object>(), $"SOAP fault: {faultString}");
+                    return ProtocolOperationResult<Dictionary<string, object>>.CreateFailure($"SOAP fault: {faultString}");
                 }
 
                 var deviceInfo = OnvifSoapTemplates.ExtractDeviceInfo(response.Content);
                 var objectData = deviceInfo.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
 
-                return (true, objectData, string.Empty);
+                return ProtocolOperationResult<Dictionary<string, object>>.CreateSuccess(objectData);
             }
             catch (Exception ex)
             {
-                return (false, new Dictionary<string, object>(), ex.Message);
+                return ProtocolOperationResult<Dictionary<string, object>>.CreateFailure(ex.Message);
             }
         }
 
         /// <summary>
-        /// Gets capabilities from the ONVIF camera
+        /// Gets comprehensive network configuration from the ONVIF device
         /// </summary>
-        public async Task<(bool Success, Dictionary<string, object> Capabilities, string ErrorMessage)> GetCapabilitiesAsync()
+        public async Task<ProtocolOperationResult<Dictionary<string, object>>> GetNetworkInfoAsync(CancellationToken cancellationToken = default)
         {
             try
             {
-                var capabilitiesRequest = OnvifSoapTemplates.CreateGetCapabilitiesRequest(_connection.Username, _connection.Password);
-                var response = await SendSoapRequestAsync(capabilitiesRequest, OnvifUrl.SoapActions.GetCapabilities);
+                var networkConfig = new Dictionary<string, object>();
+                var errors = new List<string>();
 
-                if (!response.Success)
+                // Get network interfaces (IP, subnet mask, MAC address)
+                try
                 {
-                    return (false, new Dictionary<string, object>(), $"Failed to get capabilities: {response.StatusCode}");
+                    var networkRequest = OnvifSoapTemplates.CreateGetNetworkInterfacesRequest(_connection.Username, _connection.Password);
+                    var networkResponse = await _connection.SendSoapToDeviceServiceAsync(networkRequest, OnvifUrl.SoapActions.GetNetworkInterfaces);
+
+                    if (networkResponse.Success && !OnvifSoapTemplates.IsSoapFault(networkResponse.Content))
+                    {
+                        var networkInfo = OnvifSoapTemplates.ExtractNetworkInfo(networkResponse.Content);
+                        foreach (var info in networkInfo)
+                        {
+                            networkConfig[info.Key] = info.Value;
+                        }
+                    }
+                    else if (OnvifSoapTemplates.IsSoapFault(networkResponse.Content))
+                    {
+                        errors.Add($"Network interfaces: {OnvifSoapTemplates.ExtractSoapFaultString(networkResponse.Content)}");
+                    }
+                    else
+                    {
+                        errors.Add($"Network interfaces failed: {networkResponse.StatusCode}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Network interfaces error: {ex.Message}");
                 }
 
-                if (OnvifSoapTemplates.IsSoapFault(response.Content))
+                // Get DNS configuration
+                try
                 {
-                    var faultString = OnvifSoapTemplates.ExtractSoapFaultString(response.Content);
-                    return (false, new Dictionary<string, object>(), $"SOAP fault: {faultString}");
+                    var dnsRequest = OnvifSoapTemplates.CreateGetDNSRequest(_connection.Username, _connection.Password);
+                    var dnsResponse = await _connection.SendSoapToDeviceServiceAsync(dnsRequest, OnvifUrl.SoapActions.GetDNS);
+
+                    if (dnsResponse.Success && !OnvifSoapTemplates.IsSoapFault(dnsResponse.Content))
+                    {
+                        var dnsInfo = OnvifSoapTemplates.ExtractDNSInfo(dnsResponse.Content);
+                        foreach (var info in dnsInfo)
+                        {
+                            networkConfig.TryAdd(info.Key, info.Value);
+                        }
+                    }
+                    else if (OnvifSoapTemplates.IsSoapFault(dnsResponse.Content))
+                    {
+                        errors.Add($"DNS: {OnvifSoapTemplates.ExtractSoapFaultString(dnsResponse.Content)}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"DNS error: {ex.Message}");
                 }
 
-                var capabilities = OnvifSoapTemplates.ParseSoapResponse(response.Content);
-                var objectData = capabilities.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
+                // Get default gateway
+                try
+                {
+                    var gatewayRequest = OnvifSoapTemplates.CreateGetNetworkDefaultGatewayRequest(_connection.Username, _connection.Password);
+                    var gatewayResponse = await _connection.SendSoapToDeviceServiceAsync(gatewayRequest, OnvifUrl.SoapActions.GetNetworkDefaultGateway);
 
-                return (true, objectData, string.Empty);
+                    if (gatewayResponse.Success && !OnvifSoapTemplates.IsSoapFault(gatewayResponse.Content))
+                    {
+                        var gatewayInfo = OnvifSoapTemplates.ExtractGatewayInfo(gatewayResponse.Content);
+                        foreach (var info in gatewayInfo)
+                        {
+                            networkConfig.TryAdd(info.Key, info.Value);
+                        }
+                    }
+                    else if (OnvifSoapTemplates.IsSoapFault(gatewayResponse.Content))
+                    {
+                        errors.Add($"Gateway: {OnvifSoapTemplates.ExtractSoapFaultString(gatewayResponse.Content)}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Gateway error: {ex.Message}");
+                }
+
+                var errorMessage = errors.Any() ? string.Join("; ", errors) : string.Empty;
+                var success = networkConfig.Any();
+
+                return success
+                    ? ProtocolOperationResult<Dictionary<string, object>>.CreateSuccess(networkConfig)
+                    : ProtocolOperationResult<Dictionary<string, object>>.CreateFailure(errorMessage);
             }
             catch (Exception ex)
             {
-                return (false, new Dictionary<string, object>(), ex.Message);
+                return ProtocolOperationResult<Dictionary<string, object>>.CreateFailure(ex.Message);
             }
         }
 
         /// <summary>
-        /// Gets current network configuration from the ONVIF device
+        /// Gets video configuration information from ONVIF device
         /// </summary>
-        public async Task<(bool Success, Dictionary<string, object> Configuration, string ErrorMessage)> GetNetworkConfigurationAsync()
+        public async Task<ProtocolOperationResult<Dictionary<string, object>>> GetVideoInfoAsync(CancellationToken cancellationToken = default)
         {
             try
             {
-                var networkRequest = OnvifSoapTemplates.CreateGetNetworkInterfacesRequest(_connection.Username, _connection.Password);
-                var response = await SendSoapRequestAsync(networkRequest, OnvifUrl.SoapActions.GetNetworkInterfaces);
+                var config = new Dictionary<string, object>();
 
-                if (!response.Success)
+                // Get media service URL
+                var mediaServiceUrl = await _connection.GetMediaServiceUrlAsync();
+                if (string.IsNullOrEmpty(mediaServiceUrl))
                 {
-                    return (false, new Dictionary<string, object>(), $"Failed to get network config: {response.StatusCode}");
+                    return ProtocolOperationResult<Dictionary<string, object>>.CreateFailure("Media service not available");
                 }
 
-                if (OnvifSoapTemplates.IsSoapFault(response.Content))
+                // Get media profiles
+                var profilesRequest = OnvifSoapTemplates.CreateGetProfilesRequest(_connection.Username, _connection.Password);
+                var profilesResponse = await _connection.SendSoapToMediaServiceAsync(profilesRequest, OnvifUrl.SoapActions.GetProfiles);
+
+                if (profilesResponse.Success && !OnvifSoapTemplates.IsSoapFault(profilesResponse.Content))
                 {
-                    var faultString = OnvifSoapTemplates.ExtractSoapFaultString(response.Content);
-                    return (false, new Dictionary<string, object>(), $"SOAP fault: {faultString}");
+                    var profiles = OnvifSoapTemplates.ExtractMediaProfiles(profilesResponse.Content);
+
+                    if (profiles.Any())
+                    {
+                        var mainProfile = profiles.First(); // Use the first profile as main
+
+                        // Extract video configuration from the main profile
+                        config["codecType"] = mainProfile.Encoding;
+                        config["resolution"] = mainProfile.Resolution;
+                        config["frameRate"] = mainProfile.FrameRate;
+                        config["bitRate"] = mainProfile.BitRate;
+                        config["quality"] = mainProfile.Quality;
+                        config["govLength"] = mainProfile.GovLength;
+                        config["profileName"] = mainProfile.Name;
+                        config["profileToken"] = mainProfile.Token;
+
+                        // Try to get stream URIs for the profiles
+                        for (int i = 0; i < Math.Min(profiles.Count, 2); i++) // Get up to 2 streams
+                        {
+                            var profile = profiles[i];
+                            var streamUriRequest = OnvifSoapTemplates.CreateGetStreamUriRequest(
+                                profile.Token, _connection.Username, _connection.Password);
+
+                            var streamResponse = await _connection.SendSoapToMediaServiceAsync(streamUriRequest, OnvifUrl.SoapActions.GetStreamUri);
+
+                            if (streamResponse.Success && !OnvifSoapTemplates.IsSoapFault(streamResponse.Content))
+                            {
+                                var streamUri = OnvifSoapTemplates.ExtractStreamUri(streamResponse.Content);
+                                if (!string.IsNullOrEmpty(streamUri))
+                                {
+                                    config[$"streamUri{i + 1}"] = streamUri;
+                                }
+                            }
+                        }
+
+                        // Set quality control type based on available information
+                        if (config.ContainsKey("bitRate") && !string.IsNullOrEmpty(config["bitRate"].ToString()))
+                        {
+                            config["qualityControlType"] = "CBR"; // Assume CBR if bitrate is specified
+                        }
+                        else if (config.ContainsKey("quality") && !string.IsNullOrEmpty(config["quality"].ToString()))
+                        {
+                            config["qualityControlType"] = "VBR"; // Assume VBR if quality is specified
+                        }
+                    }
                 }
 
-                var networkConfig = OnvifSoapTemplates.ParseSoapResponse(response.Content);
-                var objectData = networkConfig.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
-
-                return (true, objectData, string.Empty);
+                return config.Any()
+                    ? ProtocolOperationResult<Dictionary<string, object>>.CreateSuccess(config)
+                    : ProtocolOperationResult<Dictionary<string, object>>.CreateFailure("No video configuration available");
             }
             catch (Exception ex)
             {
-                return (false, new Dictionary<string, object>(), ex.Message);
+                return ProtocolOperationResult<Dictionary<string, object>>.CreateFailure(ex.Message);
             }
         }
 
         /// <summary>
-        /// Gets NTP configuration from the ONVIF device
+        /// Sets network configuration on the ONVIF device
         /// </summary>
-        public async Task<(bool Success, Dictionary<string, object> Configuration, string ErrorMessage)> GetNtpConfigurationAsync()
-        {
-            try
-            {
-                var ntpRequest = OnvifSoapTemplates.CreateGetNtpRequest(_connection.Username, _connection.Password);
-                var response = await SendSoapRequestAsync(ntpRequest, OnvifUrl.SoapActions.GetNTP);
-
-                if (!response.Success)
-                {
-                    return (false, new Dictionary<string, object>(), $"Failed to get NTP config: {response.StatusCode}");
-                }
-
-                if (OnvifSoapTemplates.IsSoapFault(response.Content))
-                {
-                    var faultString = OnvifSoapTemplates.ExtractSoapFaultString(response.Content);
-                    return (false, new Dictionary<string, object>(), $"SOAP fault: {faultString}");
-                }
-
-                var ntpConfig = OnvifSoapTemplates.ParseSoapResponse(response.Content);
-                var objectData = ntpConfig.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
-
-                return (true, objectData, string.Empty);
-            }
-            catch (Exception ex)
-            {
-                return (false, new Dictionary<string, object>(), ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// Updates network configuration with validation
-        /// </summary>
-        public async Task<OnvifOperationResult> UpdateNetworkConfigurationAsync(Camera camera)
+        public async Task<ProtocolOperationResult<bool>> SetNetworkConfigurationAsync(Camera camera, CancellationToken cancellationToken = default)
         {
             try
             {
                 // Get current network interfaces to find the token
                 var getNetworkRequest = OnvifSoapTemplates.CreateGetNetworkInterfacesRequest(_connection.Username, _connection.Password);
-                var getResponse = await SendSoapRequestAsync(getNetworkRequest, OnvifUrl.SoapActions.GetNetworkInterfaces);
+                var getResponse = await _connection.SendSoapToDeviceServiceAsync(getNetworkRequest, OnvifUrl.SoapActions.GetNetworkInterfaces);
 
                 if (!getResponse.Success)
                 {
-                    return OnvifOperationResult.CreateFailure($"Failed to get network interfaces: {getResponse.StatusCode}");
+                    return ProtocolOperationResult<bool>.CreateFailure($"Failed to get network interfaces: {getResponse.StatusCode}");
                 }
 
                 var interfaceToken = OnvifSoapTemplates.ExtractNetworkInterfaceToken(getResponse.Content);
 
                 // Set new network configuration
                 var setNetworkRequest = OnvifSoapTemplates.CreateSetNetworkInterfacesRequest(camera, interfaceToken, _connection.Username, _connection.Password);
-                var setResponse = await SendSoapRequestAsync(setNetworkRequest, OnvifUrl.SoapActions.SetNetworkInterfaces);
+                var setResponse = await _connection.SendSoapToDeviceServiceAsync(setNetworkRequest, OnvifUrl.SoapActions.SetNetworkInterfaces);
 
                 if (!setResponse.Success)
                 {
-                    return OnvifOperationResult.CreateFailure($"Failed to set network config: {setResponse.StatusCode}");
+                    return ProtocolOperationResult<bool>.CreateFailure($"Failed to set network config: {setResponse.StatusCode}");
                 }
 
                 if (OnvifSoapTemplates.IsSoapFault(setResponse.Content))
                 {
                     var faultString = OnvifSoapTemplates.ExtractSoapFaultString(setResponse.Content);
-                    return OnvifOperationResult.CreateFailure($"SOAP fault: {faultString}");
+                    return ProtocolOperationResult<bool>.CreateFailure($"SOAP fault: {faultString}");
                 }
 
-                return OnvifOperationResult.CreateSuccess("Network configuration updated successfully");
+                return ProtocolOperationResult<bool>.CreateSuccess(true);
             }
             catch (Exception ex)
             {
-                return OnvifOperationResult.CreateFailure(ex.Message);
+                return ProtocolOperationResult<bool>.CreateFailure(ex.Message);
             }
-        }
-
-        private async Task<(bool Success, string Content, System.Net.HttpStatusCode StatusCode)> SendSoapRequestAsync(string soapRequest, string soapAction)
-        {
-            // Discover device service URL if not already done
-            if (string.IsNullOrEmpty(_connection.GetType().GetField("_deviceServiceUrl", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(_connection) as string))
-            {
-                var discoverMethod = _connection.GetType().GetMethod("DiscoverDeviceServiceAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var discovered = await (Task<bool>)discoverMethod!.Invoke(_connection, null)!;
-                if (!discovered)
-                {
-                    return (false, string.Empty, System.Net.HttpStatusCode.ServiceUnavailable);
-                }
-            }
-
-            var deviceServiceUrl = (string?)_connection.GetType().GetField("_deviceServiceUrl", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(_connection);
-            if (string.IsNullOrEmpty(deviceServiceUrl))
-            {
-                return (false, string.Empty, System.Net.HttpStatusCode.ServiceUnavailable);
-            }
-
-            var sendMethod = _connection.GetType().GetMethod("SendSoapRequestAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var result = await (Task<(bool Success, string Content, System.Net.HttpStatusCode StatusCode)>)sendMethod!.Invoke(_connection, new object[] { deviceServiceUrl, soapRequest, soapAction })!;
-            
-            return result;
         }
 
         public void Dispose()

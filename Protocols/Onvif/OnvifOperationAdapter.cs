@@ -36,12 +36,7 @@ namespace wpfhikip.Protocols.Onvif
             try
             {
                 using var operation = new OnvifOperation(_connection);
-
-                var (success, status, error) = await operation.GetCameraStatusAsync().ConfigureAwait(false);
-
-                return success
-                    ? ProtocolOperationResult<Dictionary<string, object>>.CreateSuccess(status)
-                    : ProtocolOperationResult<Dictionary<string, object>>.CreateFailure(error);
+                return await operation.GetCameraStatusAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -54,12 +49,7 @@ namespace wpfhikip.Protocols.Onvif
             try
             {
                 using var operation = new OnvifOperation(_connection);
-
-                var (success, config, error) = await operation.GetVideoConfigurationAsync().ConfigureAwait(false);
-
-                return success
-                    ? ProtocolOperationResult<Dictionary<string, object>>.CreateSuccess(config)
-                    : ProtocolOperationResult<Dictionary<string, object>>.CreateFailure(error);
+                return await operation.GetVideoConfigurationAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -72,12 +62,7 @@ namespace wpfhikip.Protocols.Onvif
             try
             {
                 using var operation = new OnvifOperation(_connection);
-
-                var (success, error) = await operation.RebootCameraAsync().ConfigureAwait(false);
-
-                return success
-                    ? ProtocolOperationResult<bool>.CreateSuccess(true)
-                    : ProtocolOperationResult<bool>.CreateFailure(error);
+                return await operation.RebootCameraAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

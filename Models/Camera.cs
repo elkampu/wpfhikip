@@ -70,7 +70,10 @@ namespace wpfhikip.Models
             set
             {
                 if (SetProperty(ref _isCompatible, value))
+                {
                     OnPropertyChanged(nameof(CanShowCameraInfo));
+                    OnPropertyChanged(nameof(ToolTipText));
+                }
             }
         }
 
@@ -83,7 +86,10 @@ namespace wpfhikip.Models
             set
             {
                 if (SetProperty(ref _requiresAuthentication, value))
+                {
                     OnPropertyChanged(nameof(CanShowCameraInfo));
+                    OnPropertyChanged(nameof(ToolTipText));
+                }
             }
         }
 
@@ -96,7 +102,10 @@ namespace wpfhikip.Models
             set
             {
                 if (SetProperty(ref _isAuthenticated, value))
+                {
                     OnPropertyChanged(nameof(CanShowCameraInfo));
+                    OnPropertyChanged(nameof(ToolTipText));
+                }
             }
         }
 
@@ -104,6 +113,27 @@ namespace wpfhikip.Models
         /// Computed property to determine if camera info button should be enabled
         /// </summary>
         public bool CanShowCameraInfo => IsCompatible && (!RequiresAuthentication || IsAuthenticated);
+
+        /// <summary>
+        /// Tooltip text explaining the status of the device info button
+        /// </summary>
+        public string ToolTipText
+        {
+            get
+            {
+                if (!IsCompatible)
+                    return "Run compatibility check first to enable device information";
+
+                if (RequiresAuthentication && !IsAuthenticated)
+                    return "Authentication required - check credentials and run compatibility check";
+
+                if (CanShowCameraInfo)
+                    return "Click to view device information and tools";
+
+                return "Device information not available";
+            }
+        }
+
         // UI-related properties
         public bool IsSelected
         {

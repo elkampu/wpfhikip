@@ -1,7 +1,6 @@
 ﻿using System.Collections.Frozen;
 using wpfhikip.Models;
 using wpfhikip.Protocols.Hikvision;
-using wpfhikip.Protocols.Dahua;
 using wpfhikip.Protocols.Axis;
 using wpfhikip.Protocols.Onvif;
 
@@ -16,7 +15,6 @@ namespace wpfhikip.Protocols.Common
             new Dictionary<CameraProtocol, Func<string, int, string, string, IProtocolConnection>>
             {
                 { CameraProtocol.Hikvision, (ip, port, user, pass) => new HikvisionConnection(ip, port, user, pass) },
-                { CameraProtocol.Dahua, (ip, port, user, pass) => new DahuaConnection(ip, port, user, pass) },
                 { CameraProtocol.Axis, (ip, port, user, pass) => new AxisConnection(ip, port, user, pass) },
                 { CameraProtocol.Onvif, (ip, port, user, pass) => new OnvifConnection(ip, port, user, pass) }
             }.ToFrozenDictionary();

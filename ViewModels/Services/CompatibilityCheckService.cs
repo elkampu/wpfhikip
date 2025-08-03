@@ -123,40 +123,74 @@ namespace wpfhikip.ViewModels.Services
             {
                 if (result.IsCompatible)
                 {
-                    device.Status = $"{result.DetectedProtocol} compatible";
-                    device.CellColor = Brushes.LightGreen;
-                    device.IsCompatible = true;
                     device.Protocol = result.DetectedProtocol;
                     device.RequiresAuthentication = result.RequiresAuthentication;
                     device.IsAuthenticated = result.IsAuthenticated;
+                    device.IsCompatible = true;
 
-                    // Retrieve device information (model and manufacturer) after successful compatibility check
-                    try
+                    // Enhanced status determination based on authentication state
+                    if (!result.RequiresAuthentication)
                     {
-                        device.AddProtocolLog("System", "Device Info",
-                            "Retrieving device information after successful compatibility check...");
+                        // Protocol is compatible and doesn't need authentication
+                        device.Status = $"{result.DetectedProtocol} compatible";
+                        device.CellColor = Brushes.LightGreen;
+                    }
+                    else if (result.IsAuthenticated)
+                    {
+                        // Protocol is compatible and authentication successful
+                        device.Status = $"{result.DetectedProtocol} authenticated";
+                        device.CellColor = Brushes.LightGreen;
+                    }
+                    else
+                    {
+                        // Protocol is compatible but authentication failed
+                        device.Status = $"{result.DetectedProtocol} - Auth failed";
+                        device.CellColor = Brushes.Orange; // Use orange to distinguish from full success
 
-                        // Load device information to get model and manufacturer
-                        var infoLoaded = await ProtocolManager.LoadCameraInfoAsync(device, CancellationToken.None);
-
-                        if (infoLoaded)
+                        // Add specific authentication message if available
+                        if (!string.IsNullOrEmpty(result.AuthenticationMessage))
                         {
-                            device.AddProtocolLog("System", "Device Info",
-                                $"Successfully retrieved device info - Manufacturer: {device.Manufacturer ?? "Unknown"}, Model: {device.Model ?? "Unknown"}",
-                                ProtocolLogLevel.Success);
-                        }
-                        else
-                        {
-                            device.AddProtocolLog("System", "Device Info",
-                                "Failed to retrieve complete device information",
-                                ProtocolLogLevel.Warning);
+                            device.AddProtocolLog(result.DetectedProtocol.ToString(), "Authentication",
+                                $"Auth failed: {result.AuthenticationMessage}", ProtocolLogLevel.Warning);
                         }
                     }
-                    catch (Exception ex)
+
+                    // Only try to retrieve device information if authentication is successful or not required
+                    if (!result.RequiresAuthentication || result.IsAuthenticated)
                     {
-                        device.AddProtocolLog("System", "Device Info Error",
-                            $"Error retrieving device information: {ex.Message}",
-                            ProtocolLogLevel.Error);
+                        try
+                        {
+                            device.AddProtocolLog("System", "Device Info",
+                                "Retrieving device information after successful compatibility check...");
+
+                            // Load device information to get model and manufacturer
+                            var infoLoaded = await ProtocolManager.LoadCameraInfoAsync(device, CancellationToken.None);
+
+                            if (infoLoaded)
+                            {
+                                device.AddProtocolLog("System", "Device Info",
+                                    $"Successfully retrieved device info - Manufacturer: {device.Manufacturer ?? "Unknown"}, Model: {device.Model ?? "Unknown"}",
+                                    ProtocolLogLevel.Success);
+                            }
+                            else
+                            {
+                                device.AddProtocolLog("System", "Device Info",
+                                    "Failed to retrieve complete device information",
+                                    ProtocolLogLevel.Warning);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            device.AddProtocolLog("System", "Device Info Error",
+                                $"Error retrieving device information: {ex.Message}",
+                                ProtocolLogLevel.Error);
+                        }
+                    }
+                    else
+                    {
+                        device.AddProtocolLog("System", "Device Info",
+                            "Skipping device information retrieval due to authentication failure",
+                            ProtocolLogLevel.Info);
                     }
                 }
                 else

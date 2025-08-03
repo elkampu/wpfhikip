@@ -15,6 +15,8 @@ namespace wpfhikip.Protocols.Onvif
         // Alternative common ONVIF paths
         public const string DeviceServiceAlt = "/onvif/services";
         public const string DeviceServiceAlt2 = "/onvif/device";
+        public const string MediaServiceAlt = "/onvif/media";
+        public const string MediaServiceAlt2 = "/onvif/Media2";
 
         // WS-Discovery multicast address for device discovery
         public const string DiscoveryMulticastAddress = "239.255.255.250";
@@ -31,7 +33,7 @@ namespace wpfhikip.Protocols.Onvif
         {
             private static readonly StringBuilder s_stringBuilder = new(256);
             private static readonly object s_lock = new();
-            
+
             // Cache common ports array to avoid allocation
             private static readonly int[] s_commonPorts = { 80, 8080, 8000, 554, 8554, 443, 8443 };
 
@@ -48,14 +50,14 @@ namespace wpfhikip.Protocols.Onvif
                     s_stringBuilder.Clear();
                     s_stringBuilder.Append(useHttps ? "https://" : "http://");
                     s_stringBuilder.Append(ipAddress);
-                    
+
                     // Only add port if it's not the default for the protocol
                     if (port != (useHttps ? 443 : 80))
                     {
                         s_stringBuilder.Append(':');
                         s_stringBuilder.Append(port);
                     }
-                    
+
                     s_stringBuilder.Append(service);
                     return s_stringBuilder.ToString();
                 }
@@ -81,6 +83,16 @@ namespace wpfhikip.Protocols.Onvif
                 };
             }
 
+            public static string[] GetPossibleMediaServiceUrls(string ipAddress, int port = 80, bool useHttps = false)
+            {
+                return new[]
+                {
+                    BuildServiceUrl(ipAddress, MediaService, port, useHttps),
+                    BuildServiceUrl(ipAddress, MediaServiceAlt, port, useHttps),
+                    BuildServiceUrl(ipAddress, MediaServiceAlt2, port, useHttps)
+                };
+            }
+
             public static int[] GetCommonOnvifPorts() => s_commonPorts;
         }
 
@@ -90,14 +102,24 @@ namespace wpfhikip.Protocols.Onvif
             // Device Service Actions
             public const string GetDeviceInformation = "http://www.onvif.org/ver10/device/wsdl/GetDeviceInformation";
             public const string GetCapabilities = "http://www.onvif.org/ver10/device/wsdl/GetCapabilities";
-
             public const string GetNetworkInterfaces = "http://www.onvif.org/ver10/device/wsdl/GetNetworkInterfaces";
             public const string SetNetworkInterfaces = "http://www.onvif.org/ver10/device/wsdl/SetNetworkInterfaces";
+            public const string GetDNS = "http://www.onvif.org/ver10/device/wsdl/GetDNS";
+            public const string SetDNS = "http://www.onvif.org/ver10/device/wsdl/SetDNS";
+            public const string GetNetworkDefaultGateway = "http://www.onvif.org/ver10/device/wsdl/GetNetworkDefaultGateway";
+            public const string SetNetworkDefaultGateway = "http://www.onvif.org/ver10/device/wsdl/SetNetworkDefaultGateway";
             public const string GetNTP = "http://www.onvif.org/ver10/device/wsdl/GetNTP";
             public const string SetNTP = "http://www.onvif.org/ver10/device/wsdl/SetNTP";
             public const string GetSystemDateAndTime = "http://www.onvif.org/ver10/device/wsdl/GetSystemDateAndTime";
             public const string SetSystemDateAndTime = "http://www.onvif.org/ver10/device/wsdl/SetSystemDateAndTime";
             public const string SystemReboot = "http://www.onvif.org/ver10/device/wsdl/SystemReboot";
+
+            // Media Service Actions
+            public const string GetProfiles = "http://www.onvif.org/ver10/media/wsdl/GetProfiles";
+            public const string GetVideoEncoderConfiguration = "http://www.onvif.org/ver10/media/wsdl/GetVideoEncoderConfiguration";
+            public const string GetStreamUri = "http://www.onvif.org/ver10/media/wsdl/GetStreamUri";
+            public const string GetVideoSources = "http://www.onvif.org/ver10/media/wsdl/GetVideoSources";
+            public const string GetVideoEncoderConfigurations = "http://www.onvif.org/ver10/media/wsdl/GetVideoEncoderConfigurations";
 
             // Discovery Actions
             public const string Probe = "http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe";

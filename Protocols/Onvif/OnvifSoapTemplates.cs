@@ -331,7 +331,75 @@ namespace wpfhikip.Protocols.Onvif
 
             return CreateAuthenticatedSoapEnvelope(body, username, password);
         }
+        // Add these methods to your existing OnvifSoapTemplates class:
 
+        /// <summary>
+        /// Creates a DHCP-only disable request
+        /// </summary>
+        public static string CreateDhcpOnlyDisableRequest(string interfaceToken, string username, string password)
+        {
+            var body = $@"<tds:SetNetworkInterfaces>
+        <tds:InterfaceToken>{interfaceToken}</tds:InterfaceToken>
+        <tds:NetworkInterface>
+            <tt:Enabled>true</tt:Enabled>
+            <tt:IPv4>
+                <tt:Enabled>true</tt:Enabled>
+                <tt:Config>
+                    <tt:DHCP>false</tt:DHCP>
+                </tt:Config>
+            </tt:IPv4>
+        </tds:NetworkInterface>
+    </tds:SetNetworkInterfaces>";
+
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
+        }
+
+        /// <summary>
+        /// Creates a network interface toggle request (enable/disable)
+        /// </summary>
+        public static string CreateNetworkInterfaceToggleRequest(string interfaceToken, bool enabled, string username, string password)
+        {
+            var body = $@"<tds:SetNetworkInterfaces>
+        <tds:InterfaceToken>{interfaceToken}</tds:InterfaceToken>
+        <tds:NetworkInterface>
+            <tt:Enabled>{enabled.ToString().ToLower()}</tt:Enabled>
+        </tds:NetworkInterface>
+    </tds:SetNetworkInterfaces>";
+
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
+        }
+
+        /// <summary>
+        /// Creates a forced DHCP disable request with minimal manual configuration
+        /// </summary>
+        public static string CreateForcedDhcpDisableRequest(Camera camera, string interfaceToken, string username, string password)
+        {
+            if (string.IsNullOrEmpty(camera.NewIP))
+            {
+                throw new ArgumentException("Target IP address is required for forced DHCP disable");
+            }
+
+            var prefixLength = CalculatePrefixLength(camera.NewMask ?? "255.255.255.0");
+
+            var body = $@"<tds:SetNetworkInterfaces>
+        <tds:InterfaceToken>{interfaceToken}</tds:InterfaceToken>
+        <tds:NetworkInterface>
+            <tt:Enabled>true</tt:Enabled>
+            <tt:IPv4>
+                <tt:Enabled>true</tt:Enabled>
+                <tt:Config>
+                    <tt:DHCP>false</tt:DHCP>
+                    <tt:Manual>
+                        <tt:Address>{camera.NewIP}</tt:Address>
+                        <tt:PrefixLength>{prefixLength}</tt:PrefixLength>
+                    </tt:Manual>
+                </tt:Config>
+            </tt:IPv4>
+        </tds:NetworkInterface>
+    </tds:SetNetworkInterfaces>";
+
+            return CreateAuthenticatedSoapEnvelope(body, username, password);
+        }
         /// <summary>
         /// Creates a separate SetNetworkInterfaces request for manual IP configuration
         /// This is called after DHCP is disabled to set the manual configuration

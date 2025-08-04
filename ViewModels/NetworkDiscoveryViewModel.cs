@@ -163,6 +163,7 @@ namespace wpfhikip.ViewModels
         public ICommand SelectNoNetworksCommand { get; }
         public ICommand ExportResultsCommand { get; }
         public ICommand RefreshNetworksCommand { get; }
+        public ICommand ShowScanProgressCommand { get; }
 
         #endregion
 
@@ -182,6 +183,7 @@ namespace wpfhikip.ViewModels
             SelectNoNetworksCommand = new RelayCommand(_ => SelectNoNetworks());
             ExportResultsCommand = new RelayCommand(_ => ExportResults(), _ => TotalDevicesFound > 0);
             RefreshNetworksCommand = new RelayCommand(_ => RefreshNetworkSegments());
+            ShowScanProgressCommand = new RelayCommand(_ => ShowScanProgress());
 
             // Initialize data
             InitializeDiscoveryMethods();
@@ -592,7 +594,6 @@ namespace wpfhikip.ViewModels
             }
         }
 
-
         private void ClearResults()
         {
             ResultsByMethod.Clear();
@@ -640,6 +641,36 @@ namespace wpfhikip.ViewModels
         {
             // TODO: Implement export functionality
             MessageBox.Show("Export functionality will be implemented here.", "Export",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void ShowScanProgress()
+        {
+            // Create a simple progress dialog showing detailed scan information
+            var progressInfo = new System.Text.StringBuilder();
+            progressInfo.AppendLine("Current Scan Progress:");
+            progressInfo.AppendLine($"Overall Progress: {OverallProgress:F1}%");
+            progressInfo.AppendLine($"Status: {StatusMessage}");
+            progressInfo.AppendLine();
+            progressInfo.AppendLine("Discovery Methods:");
+
+            foreach (var method in DiscoveryMethods.Where(m => m.IsSelected))
+            {
+                var status = method.IsRunning ? "Running" :
+                            method.IsEnabled ? "Ready" : "Unavailable";
+                progressInfo.AppendLine($"  • {method.Name}: {status}");
+                if (!string.IsNullOrEmpty(method.Progress))
+                {
+                    progressInfo.AppendLine($"    {method.Progress}");
+                }
+            }
+
+            progressInfo.AppendLine();
+            progressInfo.AppendLine($"Active Methods: {ActiveMethodsCount}/{SelectedMethodsCount}");
+            progressInfo.AppendLine($"Selected Networks: {SelectedNetworksCount}");
+            progressInfo.AppendLine($"Devices Found: {TotalDevicesFound}");
+
+            MessageBox.Show(progressInfo.ToString(), "Scan Progress Details",
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
 

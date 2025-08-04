@@ -22,7 +22,6 @@
     <Grid Background="#f8fafc">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -64,127 +63,56 @@
             </Grid>
         </Border>
 
-        <!-- Statistics Panel -->
-        <Border Grid.Row="1"
-                Style="{StaticResource ModernCardStyle}"
-                Margin="24,16,24,8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="2*" />
-                </Grid.ColumnDefinitions>
-
-                <!-- Devices Found -->
-                <Border Grid.Column="0"
-                        Style="{StaticResource StatsCardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="DEVICES FOUND"
-                                   FontSize="11"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                        <TextBlock Text="{Binding TotalDevicesFound}"
-                                   FontSize="32"
-                                   FontWeight="Bold"
-                                   Foreground="#16a34a" />
-                        <TextBlock Text="Unique devices discovered"
-                                   FontSize="12"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Methods Active -->
-                <Border Grid.Column="1"
-                        Style="{StaticResource StatsCardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="METHODS ACTIVE"
-                                   FontSize="11"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                        <TextBlock FontSize="32"
-                                   FontWeight="Bold"
-                                   Foreground="#2563eb">
-                            <TextBlock.Text>
-                                <MultiBinding StringFormat="{}{0}/{1}">
-                                    <Binding Path="ActiveMethodsCount" />
-                                    <Binding Path="SelectedMethodsCount" />
-                                </MultiBinding>
-                            </TextBlock.Text>
-                        </TextBlock>
-                        <TextBlock Text="Discovery methods running"
-                                   FontSize="12"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Networks Scanned -->
-                <Border Grid.Column="2"
-                        Style="{StaticResource StatsCardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="NETWORKS"
-                                   FontSize="11"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                        <TextBlock Text="{Binding SelectedNetworksCount}"
-                                   FontSize="32"
-                                   FontWeight="Bold"
-                                   Foreground="#7c3aed" />
-                        <TextBlock Text="Network segments selected"
-                                   FontSize="12"
-                                   Foreground="{StaticResource SEC_MidGrey}" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Progress -->
-                <Border Grid.Column="3"
-                        Style="{StaticResource StatsCardStyle}">
-                    <StackPanel>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0"
-                                       Text="SCAN PROGRESS"
-                                       FontSize="11"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource SEC_MidGrey}" />
-                            <TextBlock Grid.Column="1"
-                                       Text="{Binding OverallProgress, StringFormat={}{0:F1}%}"
-                                       FontSize="14"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource SEC_DarkGrey}" />
-                        </Grid>
-                        <ProgressBar Value="{Binding OverallProgress}"
-                                     Maximum="100"
-                                     Height="8"
-                                     Margin="0,8,0,4"
-                                     Background="#e5e7eb"
-                                     Foreground="#3b82f6" />
-                        <TextBlock Text="{Binding StatusMessage}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource SEC_MidGrey}"
-                                   TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </Border>
-
         <!-- Main Content -->
-        <Grid Grid.Row="2"
-              Margin="24,8,24,16">
+        <Grid Grid.Row="1"
+              Margin="24,16,24,16">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="320" />
                 <ColumnDefinition Width="16" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left Panel - Configuration -->
+            <!-- Left Panel - Configuration and Statistics -->
             <StackPanel Grid.Column="0">
+                <!-- Statistics Panel -->
+                <Border Style="{StaticResource ModernCardStyle}"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="Scan Statistics"
+                                   Style="{StaticResource SectionTitleStyle}"
+                                   Margin="0,0,0,12" />
+
+                        <!-- Devices Found -->
+                        <Border Style="{StaticResource StatsCardStyle}"
+                                Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="DEVICES FOUND"
+                                           FontSize="11"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource SEC_MidGrey}" />
+                                <TextBlock Text="{Binding TotalDevicesFound}"
+                                           FontSize="28"
+                                           FontWeight="Bold"
+                                           Foreground="#16a34a" />
+                                <TextBlock Text="Unique devices discovered"
+                                           FontSize="11"
+                                           Foreground="{StaticResource SEC_MidGrey}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Scan Progress Details Button -->
+                        <Button Content="📈 Scan Progress Details"
+                                Command="{Binding ShowScanProgressCommand}"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                FontSize="12"
+                                Padding="12,8"
+                                HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Border>
+
                 <!-- Discovery Methods -->
                 <Border Style="{StaticResource ModernCardStyle}"
-                        Margin="0">
+                        Margin="0,0,0,16">
                     <StackPanel>
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
@@ -213,7 +141,7 @@
                         </Grid>
 
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                      MaxHeight="250">
+                                      MaxHeight="200">
                             <ItemsControl ItemsSource="{Binding DiscoveryMethods}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -249,9 +177,10 @@
                                                 <StackPanel Grid.Column="1">
                                                     <TextBlock Text="{Binding Name}"
                                                                FontWeight="Medium"
+                                                               FontSize="11"
                                                                Foreground="{StaticResource SEC_DarkGrey}" />
                                                     <TextBlock Text="{Binding CategoryName}"
-                                                               FontSize="11"
+                                                               FontSize="10"
                                                                Foreground="{StaticResource SEC_MidGrey}" />
                                                 </StackPanel>
 
@@ -263,7 +192,7 @@
                                                             Margin="4,0"
                                                             Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibilityConverter}}">
                                                         <TextBlock Text="Running"
-                                                                   FontSize="10"
+                                                                   FontSize="9"
                                                                    Foreground="#92400e"
                                                                    FontWeight="Bold" />
                                                     </Border>
@@ -273,7 +202,7 @@
                                                             Margin="4,0"
                                                             Visibility="{Binding IsEnabled, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                                                         <TextBlock Text="Unavailable"
-                                                                   FontSize="10"
+                                                                   FontSize="9"
                                                                    Foreground="#7f1d1d"
                                                                    FontWeight="Bold" />
                                                     </Border>
@@ -289,7 +218,7 @@
 
                 <!-- Network Segments -->
                 <Border Style="{StaticResource ModernCardStyle}"
-                        Margin="0,16,0,0">
+                        Margin="0">
                     <StackPanel>
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
@@ -325,7 +254,7 @@
                         </Grid>
 
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                      MaxHeight="300">
+                                      MaxHeight="250">
                             <ItemsControl ItemsSource="{Binding NetworkSegments}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -360,14 +289,15 @@
                                                     <TextBlock Grid.Column="1"
                                                                Text="{Binding Network}"
                                                                FontWeight="Medium"
+                                                               FontSize="11"
                                                                Foreground="{StaticResource SEC_DarkGrey}" />
                                                     <TextBlock Grid.Column="2"
                                                                Text="{Binding EstimatedHostCount, StringFormat={}~{0} hosts}"
-                                                               FontSize="11"
+                                                               FontSize="10"
                                                                Foreground="{StaticResource SEC_MidGrey}" />
                                                 </Grid>
                                                 <TextBlock Text="{Binding Description}"
-                                                           FontSize="11"
+                                                           FontSize="10"
                                                            Foreground="{StaticResource SEC_MidGrey}"
                                                            Margin="24,2,0,0"
                                                            TextTrimming="CharacterEllipsis" />
@@ -381,7 +311,7 @@
                 </Border>
             </StackPanel>
 
-            <!-- Right Panel - Results -->
+            <!-- Right Panel - Results (Now with more space) -->
             <Border Grid.Column="2"
                     Style="{StaticResource ModernCardStyle}"
                     Margin="0">
@@ -550,7 +480,7 @@
         </Grid>
 
         <!-- Status Bar -->
-        <Border Grid.Row="3"
+        <Border Grid.Row="2"
                 Background="{StaticResource SEC_White}"
                 BorderBrush="{StaticResource SEC_LightGrey}"
                 BorderThickness="0,1,0,0">

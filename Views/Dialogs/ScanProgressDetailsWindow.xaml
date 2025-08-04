@@ -3,10 +3,353 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:wpfhikip.Views.Dialogs"
+        xmlns:converters="clr-namespace:wpfhikip.Converters"
         mc:Ignorable="d"
-        Title="ScanProgressDetailsWindow" Height="450" Width="800">
-    <Grid>
-        
+        Title="Scan Progress Details"
+        Height="600"
+        Width="800"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../../Resources/Styles/NetworkDiscoveryStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Add the missing converter here -->
+            <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+
+        </ResourceDictionary>
+    </Window.Resources>
+    <Grid Background="#f8fafc">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0"
+                Background="{StaticResource SEC_White}"
+                BorderBrush="{StaticResource SEC_LightGrey}"
+                BorderThickness="0,0,0,1"
+                Padding="24,16">
+            <StackPanel>
+                <TextBlock Text="Scan Progress Details"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource SEC_DarkGrey}"
+                           Margin="0,0,0,8" />
+                <TextBlock Text="Real-time progress information for the current network discovery scan"
+                           FontSize="14"
+                           Foreground="{StaticResource SEC_MidGrey}" />
+            </StackPanel>
+        </Border>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1"
+                      Margin="24,16">
+            <StackPanel>
+                <!-- Overall Progress -->
+                <Border Style="{StaticResource ModernCardStyle}"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="Overall Progress"
+                                   Style="{StaticResource SectionTitleStyle}"
+                                   Margin="0,0,0,12" />
+
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <ProgressBar Grid.Column="0"
+                                         Value="{Binding OverallProgress}"
+                                         Height="8"
+                                         Background="#e5e7eb"
+                                         Foreground="#16a34a"
+                                         VerticalAlignment="Center" />
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding OverallProgress, StringFormat={}{0:F1}%}"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource SEC_DarkGrey}"
+                                       Margin="12,0,0,0" />
+                        </Grid>
+
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   FontSize="14"
+                                   Foreground="{StaticResource SEC_MidGrey}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Summary Statistics -->
+                <Border Style="{StaticResource ModernCardStyle}"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="Summary Statistics"
+                                   Style="{StaticResource SectionTitleStyle}"
+                                   Margin="0,0,0,12" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0"
+                                    Style="{StaticResource StatsCardStyle}"
+                                    Margin="0,0,4,0">
+                                <StackPanel>
+                                    <TextBlock Text="DEVICES FOUND"
+                                               FontSize="10"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource SEC_MidGrey}" />
+                                    <TextBlock Text="{Binding TotalDevicesFound}"
+                                               FontSize="24"
+                                               FontWeight="Bold"
+                                               Foreground="#16a34a" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1"
+                                    Style="{StaticResource StatsCardStyle}"
+                                    Margin="4,0">
+                                <StackPanel>
+                                    <TextBlock Text="ACTIVE METHODS"
+                                               FontSize="10"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource SEC_MidGrey}" />
+                                    <TextBlock Text="{Binding ActiveMethodsCount}"
+                                               FontSize="24"
+                                               FontWeight="Bold"
+                                               Foreground="#f59e0b" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2"
+                                    Style="{StaticResource StatsCardStyle}"
+                                    Margin="4,0">
+                                <StackPanel>
+                                    <TextBlock Text="SELECTED METHODS"
+                                               FontSize="10"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource SEC_MidGrey}" />
+                                    <TextBlock Text="{Binding SelectedMethodsCount}"
+                                               FontSize="24"
+                                               FontWeight="Bold"
+                                               Foreground="#3b82f6" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="3"
+                                    Style="{StaticResource StatsCardStyle}"
+                                    Margin="4,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="NETWORKS"
+                                               FontSize="10"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource SEC_MidGrey}" />
+                                    <TextBlock Text="{Binding SelectedNetworksCount}"
+                                               FontSize="24"
+                                               FontWeight="Bold"
+                                               Foreground="#8b5cf6" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Discovery Methods Status -->
+                <Border Style="{StaticResource ModernCardStyle}">
+                    <StackPanel>
+                        <TextBlock Text="Discovery Methods Status"
+                                   Style="{StaticResource SectionTitleStyle}"
+                                   Margin="0,0,0,12" />
+
+                        <ItemsControl ItemsSource="{Binding DiscoveryMethods}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource SEC_White}"
+                                            BorderBrush="#e5e7eb"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Margin="0,0,0,8"
+                                            Padding="16">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Method Status Indicator -->
+                                            <Ellipse Grid.Column="0"
+                                                     Width="12"
+                                                     Height="12"
+                                                     Margin="0,0,12,0"
+                                                     VerticalAlignment="Center">
+                                                <Ellipse.Style>
+                                                    <Style TargetType="Ellipse">
+                                                        <Setter Property="Fill"
+                                                                Value="#6b7280" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsRunning}"
+                                                                         Value="True">
+                                                                <Setter Property="Fill"
+                                                                        Value="#16a34a" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsSelected}"
+                                                                         Value="True">
+                                                                <Setter Property="Fill"
+                                                                        Value="#3b82f6" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsEnabled}"
+                                                                         Value="False">
+                                                                <Setter Property="Fill"
+                                                                        Value="#ef4444" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Ellipse.Style>
+                                            </Ellipse>
+
+                                            <!-- Method Information -->
+                                            <StackPanel Grid.Column="1">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Grid.Column="0"
+                                                               Text="{Binding Name}"
+                                                               FontWeight="Bold"
+                                                               FontSize="14"
+                                                               Foreground="{StaticResource SEC_DarkGrey}" />
+
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding CategoryName}"
+                                                               FontSize="12"
+                                                               Foreground="{StaticResource SEC_MidGrey}" />
+                                                </Grid>
+
+                                                <TextBlock Text="{Binding Progress}"
+                                                           FontSize="12"
+                                                           Foreground="{StaticResource SEC_MidGrey}"
+                                                           Margin="0,4,0,0"
+                                                           Visibility="{Binding Progress, Converter={StaticResource StringToVisibilityConverter}}" />
+                                            </StackPanel>
+
+                                            <!-- Status Badge -->
+                                            <Border Grid.Column="2"
+                                                    Padding="8,4"
+                                                    CornerRadius="3"
+                                                    VerticalAlignment="Center">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsRunning}"
+                                                                         Value="True">
+                                                                <Setter Property="Background"
+                                                                        Value="#fef3c7" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsSelected}"
+                                                                         Value="True">
+                                                                <Setter Property="Background"
+                                                                        Value="#dbeafe" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsEnabled}"
+                                                                         Value="False">
+                                                                <Setter Property="Background"
+                                                                        Value="#fca5a5" />
+                                                            </DataTrigger>
+                                                            <MultiDataTrigger>
+                                                                <MultiDataTrigger.Conditions>
+                                                                    <Condition Binding="{Binding IsRunning}"
+                                                                               Value="False" />
+                                                                    <Condition Binding="{Binding IsSelected}"
+                                                                               Value="False" />
+                                                                    <Condition Binding="{Binding IsEnabled}"
+                                                                               Value="True" />
+                                                                </MultiDataTrigger.Conditions>
+                                                                <Setter Property="Background"
+                                                                        Value="#f3f4f6" />
+                                                            </MultiDataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+
+                                                <TextBlock FontSize="11"
+                                                           FontWeight="Bold">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsRunning}"
+                                                                             Value="True">
+                                                                    <Setter Property="Text"
+                                                                            Value="Running" />
+                                                                    <Setter Property="Foreground"
+                                                                            Value="#92400e" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsSelected}"
+                                                                             Value="True">
+                                                                    <Setter Property="Text"
+                                                                            Value="Selected" />
+                                                                    <Setter Property="Foreground"
+                                                                            Value="#1e40af" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsEnabled}"
+                                                                             Value="False">
+                                                                    <Setter Property="Text"
+                                                                            Value="Unavailable" />
+                                                                    <Setter Property="Foreground"
+                                                                            Value="#7f1d1d" />
+                                                                </DataTrigger>
+                                                                <MultiDataTrigger>
+                                                                    <MultiDataTrigger.Conditions>
+                                                                        <Condition Binding="{Binding IsRunning}"
+                                                                                   Value="False" />
+                                                                        <Condition Binding="{Binding IsSelected}"
+                                                                                   Value="False" />
+                                                                        <Condition Binding="{Binding IsEnabled}"
+                                                                                   Value="True" />
+                                                                    </MultiDataTrigger.Conditions>
+                                                                    <Setter Property="Text"
+                                                                            Value="Ready" />
+                                                                    <Setter Property="Foreground"
+                                                                            Value="#6b7280" />
+                                                                </MultiDataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="2"
+                Background="{StaticResource SEC_White}"
+                BorderBrush="{StaticResource SEC_LightGrey}"
+                BorderThickness="0,1,0,0"
+                Padding="24,12">
+            <Button Content="Close"
+                    Click="CloseButton_Click"
+                    Style="{StaticResource SecondaryButtonStyle}"
+                    HorizontalAlignment="Right"
+                    Padding="16,8" />
+        </Border>
     </Grid>
 </Window>

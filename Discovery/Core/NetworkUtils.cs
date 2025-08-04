@@ -2,6 +2,8 @@
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
+using wpfhikip.Discovery.Models;
+
 namespace wpfhikip.Discovery.Core
 {
     /// <summary>
@@ -12,6 +14,11 @@ namespace wpfhikip.Discovery.Core
         // Cache frequently used calculations to avoid repeated work
         private static readonly Dictionary<IPAddress, int> s_prefixLengthCache = new();
         private static readonly object s_cacheLock = new();
+
+        // Cache for local IP addresses to avoid repeated enumeration
+        private static HashSet<string>? s_cachedLocalIPs;
+        private static DateTime s_lastLocalIPUpdate = DateTime.MinValue;
+        private static readonly TimeSpan s_localIPCacheDuration = TimeSpan.FromMinutes(5);
 
         /// <summary>
         /// Gets all local network interfaces with their IP addresses and subnets
@@ -60,6 +67,151 @@ namespace wpfhikip.Discovery.Core
             }
 
             return interfaces;
+        }
+
+        /// <summary>
+        /// Gets all local IP addresses from network interfaces (cached for performance)
+        /// </summary>
+        public static HashSet<string> GetLocalIPAddresses()
+        {
+            lock (s_cacheLock)
+            {
+                // Check if cache is still valid
+                if (s_cachedLocalIPs != null && DateTime.UtcNow - s_lastLocalIPUpdate < s_localIPCacheDuration)
+                {
+                    return new HashSet<string>(s_cachedLocalIPs);
+                }
+
+                // Refresh cache
+                var localIPs = new HashSet<string>();
+
+                try
+                {
+                    // Add common local addresses
+                    localIPs.Add("127.0.0.1");
+                    localIPs.Add("::1");
+                    localIPs.Add("0.0.0.0");
+
+                    // Get all local network interface addresses
+                    var networkInterfaces = NetworkInterface.GetAllNetworkInterfaces()
+                        .Where(ni => ni.OperationalStatus == OperationalStatus.Up);
+
+                    foreach (var networkInterface in networkInterfaces)
+                    {
+                        var properties = networkInterface.GetIPProperties();
+                        foreach (var addr in properties.UnicastAddresses)
+                        {
+                            if (addr.Address.AddressFamily == AddressFamily.InterNetwork ||
+                                addr.Address.AddressFamily == AddressFamily.InterNetworkV6)
+                            {
+                                localIPs.Add(addr.Address.ToString());
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error getting local IPs: {ex.Message}");
+                }
+
+                // Update cache
+                s_cachedLocalIPs = localIPs;
+                s_lastLocalIPUpdate = DateTime.UtcNow;
+
+                return new HashSet<string>(localIPs);
+            }
+        }
+
+        /// <summary>
+        /// Checks if an IP address is a local IP address
+        /// </summary>
+        public static bool IsLocalIPAddress(IPAddress ipAddress)
+        {
+            var localIPs = GetLocalIPAddresses();
+            return localIPs.Contains(ipAddress.ToString());
+        }
+
+        /// <summary>
+        /// Checks if a target IP address is in the same subnet as any local interface
+        /// </summary>
+        public static bool IsLocalSubnet(IPAddress? targetAddress, IEnumerable<NetworkInterface> networkInterfaces)
+        {
+            if (targetAddress == null) return false;
+
+            try
+            {
+                foreach (var networkInterface in networkInterfaces)
+                {
+                    var properties = networkInterface.GetIPProperties();
+                    foreach (var unicast in properties.UnicastAddresses)
+                    {
+                        if (unicast.Address.AddressFamily == AddressFamily.InterNetwork)
+                        {
+                            var localNetwork = GetNetworkAddress(unicast.Address, unicast.IPv4Mask);
+                            var targetNetwork = GetNetworkAddress(targetAddress, unicast.IPv4Mask);
+
+                            if (localNetwork != null && targetNetwork != null && localNetwork.Equals(targetNetwork))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error checking subnet for {targetAddress}: {ex.Message}");
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Enhanced device information with DNS lookup
+        /// </summary>
+        public static async Task EnhanceDeviceInformation(DiscoveredDevice device, DiscoveryMethod discoveryMethod)
+        {
+            try
+            {
+                // Try to get hostname if not already set
+                if (string.IsNullOrEmpty(device.Name) && device.IPAddress != null)
+                {
+                    try
+                    {
+                        var hostEntry = await Dns.GetHostEntryAsync(device.IPAddress);
+                        if (!string.IsNullOrEmpty(hostEntry.HostName))
+                        {
+                            device.Name = hostEntry.HostName;
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore DNS lookup failures
+                    }
+                }
+
+                // Add discovery method
+                device.DiscoveryMethods.Add(discoveryMethod);
+
+                // Update last seen
+                device.LastSeen = DateTime.UtcNow;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error enhancing device {device.IPAddress}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Invalidates the local IP address cache to force refresh
+        /// </summary>
+        public static void InvalidateLocalIPCache()
+        {
+            lock (s_cacheLock)
+            {
+                s_cachedLocalIPs = null;
+                s_lastLocalIPUpdate = DateTime.MinValue;
+            }
         }
 
         /// <summary>
@@ -212,7 +364,7 @@ namespace wpfhikip.Discovery.Core
                         break;
                     b <<= 1;
                 }
-                
+
                 if (b > 0) // Found a gap, stop counting
                     break;
             }
@@ -236,12 +388,12 @@ namespace wpfhikip.Discovery.Core
 
             uint mask = prefixLength == 0 ? 0 : 0xFFFFFFFF << (32 - prefixLength);
             var bytes = new byte[4];
-            
+
             bytes[0] = (byte)((mask >> 24) & 0xFF);
             bytes[1] = (byte)((mask >> 16) & 0xFF);
             bytes[2] = (byte)((mask >> 8) & 0xFF);
             bytes[3] = (byte)(mask & 0xFF);
-            
+
             return new IPAddress(bytes);
         }
 
@@ -263,7 +415,7 @@ namespace wpfhikip.Discovery.Core
             if (!IPAddress.TryParse(cidr.AsSpan(0, separatorIndex), out networkAddress))
                 return false;
 
-            if (!int.TryParse(cidr.AsSpan(separatorIndex + 1), out prefixLength) || 
+            if (!int.TryParse(cidr.AsSpan(separatorIndex + 1), out prefixLength) ||
                 prefixLength is < 0 or > 32)
                 return false;
 

@@ -2,6 +2,9 @@
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
+using wpfhikip.Discovery.Core;
+
+
 namespace wpfhikip.Discovery.Protocols.Mdns
 {
     /// <summary>
@@ -192,7 +195,7 @@ namespace wpfhikip.Discovery.Protocols.Mdns
         public async Task SendUnicastQueryAsync(string[] services, IPAddress target, CancellationToken cancellationToken)
         {
             // Only allow unicast queries to LOCAL subnet addresses
-            if (!IsLocalSubnet(target))
+            if (!NetworkUtils.IsLocalSubnet(target, _activeInterfaces.Values))
             {
                 System.Diagnostics.Debug.WriteLine($"mDNS: Skipping cross-subnet unicast query to {target}");
                 return;
@@ -212,57 +215,6 @@ namespace wpfhikip.Discovery.Protocols.Mdns
                 {
                     System.Diagnostics.Debug.WriteLine($"mDNS: Local unicast send error to {target}: {ex.Message}");
                 }
-            }
-        }
-
-        private bool IsLocalSubnet(IPAddress targetAddress)
-        {
-            try
-            {
-                foreach (var networkInterface in _activeInterfaces.Values)
-                {
-                    var properties = networkInterface.GetIPProperties();
-                    foreach (var unicast in properties.UnicastAddresses)
-                    {
-                        if (unicast.Address.AddressFamily == AddressFamily.InterNetwork)
-                        {
-                            var localNetwork = GetNetworkAddress(unicast.Address, unicast.IPv4Mask);
-                            var targetNetwork = GetNetworkAddress(targetAddress, unicast.IPv4Mask);
-
-                            if (localNetwork != null && targetNetwork != null && localNetwork.Equals(targetNetwork))
-                            {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error checking if {targetAddress} is local subnet: {ex.Message}");
-            }
-
-            return false;
-        }
-
-        private IPAddress? GetNetworkAddress(IPAddress ipAddress, IPAddress subnetMask)
-        {
-            try
-            {
-                var ipBytes = ipAddress.GetAddressBytes();
-                var maskBytes = subnetMask.GetAddressBytes();
-                var networkBytes = new byte[4];
-
-                for (int i = 0; i < 4; i++)
-                {
-                    networkBytes[i] = (byte)(ipBytes[i] & maskBytes[i]);
-                }
-
-                return new IPAddress(networkBytes);
-            }
-            catch
-            {
-                return null;
             }
         }
 
@@ -315,7 +267,7 @@ namespace wpfhikip.Discovery.Protocols.Mdns
                     System.Diagnostics.Debug.WriteLine($"mDNS: Received response from {result.RemoteEndPoint.Address} ({result.Buffer.Length} bytes)");
 
                     // Log cross-subnet responses for debugging
-                    if (!IsLocalSubnet(result.RemoteEndPoint.Address))
+                    if (!NetworkUtils.IsLocalSubnet(result.RemoteEndPoint.Address, _activeInterfaces.Values))
                     {
                         System.Diagnostics.Debug.WriteLine($"mDNS: Processing cross-subnet response from {result.RemoteEndPoint.Address}");
                     }
@@ -335,23 +287,6 @@ namespace wpfhikip.Discovery.Protocols.Mdns
             {
                 System.Diagnostics.Debug.WriteLine($"mDNS: Listen error: {ex.Message}");
             }
-        }
-
-        private static bool IsClientForInterface(UdpClient client, NetworkInterface networkInterface)
-        {
-            try
-            {
-                if (client.Client.LocalEndPoint is IPEndPoint localEP)
-                {
-                    var properties = networkInterface.GetIPProperties();
-                    return properties.UnicastAddresses.Any(addr => addr.Address.Equals(localEP.Address));
-                }
-            }
-            catch
-            {
-                // Ignore errors
-            }
-            return false;
         }
 
         public void StopListening()

@@ -239,7 +239,7 @@ namespace wpfhikip.Discovery.Protocols.Mdns
                 System.Diagnostics.Debug.WriteLine($"mDNS: Message from {source.Address} - Questions: {message.Questions.Count}, Answers: {message.Answers.Count}, Authority: {message.Authority.Count}, Additional: {message.Additional.Count}");
 
                 // Log if this is a cross-subnet response
-                if (!IsLocalSubnet(source.Address))
+                if (!NetworkUtils.IsLocalSubnet(source.Address, _networkManager.ActiveInterfaces))
                 {
                     System.Diagnostics.Debug.WriteLine($"mDNS: Processing cross-subnet response from {source.Address}");
                 }
@@ -314,7 +314,6 @@ namespace wpfhikip.Discovery.Protocols.Mdns
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error processing mDNS response from {source}: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -349,8 +348,8 @@ namespace wpfhikip.Discovery.Protocols.Mdns
 
             System.Diagnostics.Debug.WriteLine($"mDNS: Total devices before filtering: {allDevices.Count}");
 
-            // Filter out local devices
-            var localIPs = GetLocalIPAddresses();
+            // Filter out local devices using the shared utility
+            var localIPs = NetworkUtils.GetLocalIPAddresses();
             System.Diagnostics.Debug.WriteLine($"mDNS: Local IPs to filter: {string.Join(", ", localIPs)}");
 
             var externalDevices = allDevices.Values
@@ -380,143 +379,26 @@ namespace wpfhikip.Discovery.Protocols.Mdns
                 }
             }
 
-            // Enhance devices with additional information
+            // Enhance devices with additional information using shared utility
             foreach (var device in externalDevices)
             {
-                await EnhanceDeviceInformation(device);
+                await NetworkUtils.EnhanceDeviceInformation(device, DiscoveryMethod.mDNS);
+
+                // Add mDNS-specific enhancement
+                if (!NetworkUtils.IsLocalSubnet(device.IPAddress, _networkManager.ActiveInterfaces))
+                {
+                    device.Capabilities.Add("Cross-subnet (passive)");
+                }
             }
 
             // Log cross-subnet discoveries
-            var crossSubnetDevices = externalDevices.Where(d => !IsLocalSubnet(d.IPAddress)).ToList();
+            var crossSubnetDevices = externalDevices.Where(d => !NetworkUtils.IsLocalSubnet(d.IPAddress, _networkManager.ActiveInterfaces)).ToList();
             if (crossSubnetDevices.Any())
             {
                 System.Diagnostics.Debug.WriteLine($"mDNS: Found {crossSubnetDevices.Count} cross-subnet devices (passive discovery)");
             }
 
             return externalDevices;
-        }
-
-        private bool IsLocalSubnet(IPAddress? deviceIP)
-        {
-            if (deviceIP == null) return false;
-
-            try
-            {
-                foreach (var networkInterface in _networkManager.ActiveInterfaces)
-                {
-                    var properties = networkInterface.GetIPProperties();
-                    foreach (var unicast in properties.UnicastAddresses)
-                    {
-                        if (unicast.Address.AddressFamily == AddressFamily.InterNetwork)
-                        {
-                            var localNetwork = GetNetworkAddress(unicast.Address, unicast.IPv4Mask);
-                            var deviceNetwork = GetNetworkAddress(deviceIP, unicast.IPv4Mask);
-
-                            if (localNetwork != null && deviceNetwork != null && localNetwork.Equals(deviceNetwork))
-                            {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error checking subnet for {deviceIP}: {ex.Message}");
-            }
-
-            return false;
-        }
-
-        private IPAddress? GetNetworkAddress(IPAddress ipAddress, IPAddress subnetMask)
-        {
-            try
-            {
-                var ipBytes = ipAddress.GetAddressBytes();
-                var maskBytes = subnetMask.GetAddressBytes();
-                var networkBytes = new byte[4];
-
-                for (int i = 0; i < 4; i++)
-                {
-                    networkBytes[i] = (byte)(ipBytes[i] & maskBytes[i]);
-                }
-
-                return new IPAddress(networkBytes);
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private async Task EnhanceDeviceInformation(DiscoveredDevice device)
-        {
-            try
-            {
-                // Try to get hostname if not already set
-                if (string.IsNullOrEmpty(device.Name) && device.IPAddress != null)
-                {
-                    try
-                    {
-                        var hostEntry = await Dns.GetHostEntryAsync(device.IPAddress);
-                        if (!string.IsNullOrEmpty(hostEntry.HostName))
-                        {
-                            device.Name = hostEntry.HostName;
-                        }
-                    }
-                    catch
-                    {
-                        // Ignore DNS lookup failures
-                    }
-                }
-
-                // Add mDNS to discovery methods
-                device.DiscoveryMethods.Add(DiscoveryMethod.mDNS);
-
-                // Mark cross-subnet devices (passive discovery)
-                if (!IsLocalSubnet(device.IPAddress))
-                {
-                    device.Capabilities.Add("Cross-subnet (passive)");
-                }
-
-                // Update last seen
-                device.LastSeen = DateTime.UtcNow;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error enhancing device {device.IPAddress}: {ex.Message}");
-            }
-        }
-
-        private HashSet<string> GetLocalIPAddresses()
-        {
-            var localIPs = new HashSet<string>();
-
-            try
-            {
-                // Get from network interfaces
-                foreach (var networkInterface in _networkManager.ActiveInterfaces)
-                {
-                    var properties = networkInterface.GetIPProperties();
-                    foreach (var addr in properties.UnicastAddresses)
-                    {
-                        if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
-                        {
-                            localIPs.Add(addr.Address.ToString());
-                        }
-                    }
-                }
-
-                // Add common local addresses
-                localIPs.Add("127.0.0.1");
-                localIPs.Add("0.0.0.0");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error getting local IPs: {ex.Message}");
-            }
-
-            return localIPs;
         }
 
         private void OnNetworkChanged(object? sender, EventArgs e)

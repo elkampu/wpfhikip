@@ -63,7 +63,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <PackageReference Include="LibVLCSharp.WPF" Version="3.9.4" />
 	  <PackageReference Include="SSDP.Portable" Version="1.0.31" />
+	  <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
 	</ItemGroup>
 
 </Project>

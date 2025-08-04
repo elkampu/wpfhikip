@@ -9,6 +9,7 @@ using System.Windows.Input;
 using wpfhikip.Models;
 using wpfhikip.Protocols.Common;
 using wpfhikip.ViewModels.Commands;
+using wpfhikip.Views.Dialogs;
 
 namespace wpfhikip.ViewModels.Dialogs
 {
@@ -63,6 +64,7 @@ namespace wpfhikip.ViewModels.Dialogs
             RefreshCommand = new RelayCommand(async _ => await RefreshCameraInfoAsync(), _ => !IsLoading);
             CancelCommand = new RelayCommand(_ => CancelLoading(), _ => IsLoading);
             CopyAllCommand = new RelayCommand(_ => CopyAllInformation(), _ => true);
+            OpenLiveStreamCommand = new RelayCommand(_ => OpenLiveStreamWindow(), _ => CanShowLiveStream);
         }
 
         // Properties
@@ -94,6 +96,20 @@ namespace wpfhikip.ViewModels.Dialogs
         {
             get => _loadingStatus;
             private set => SetProperty(ref _loadingStatus, value);
+        }
+
+        /// <summary>
+        /// Determines if the live stream button should be shown
+        /// </summary>
+        public bool CanShowLiveStream
+        {
+            get
+            {
+                // Show live stream button if camera is compatible and has IP/credentials
+                return _camera.CanShowCameraInfo &&
+                       !string.IsNullOrEmpty(_camera.CurrentIP) &&
+                       !string.IsNullOrEmpty(_camera.Username);
+            }
         }
 
         // Connection Information Properties
@@ -231,10 +247,47 @@ namespace wpfhikip.ViewModels.Dialogs
             get => _qualityControlType;
             private set => SetProperty(ref _qualityControlType, value);
         }
+
         // Commands
         public ICommand RefreshCommand { get; }
         public ICommand CancelCommand { get; }
         public ICommand CopyAllCommand { get; }
+        public ICommand OpenLiveStreamCommand { get; }
+
+        /// <summary>
+        /// Opens the live video stream window
+        /// </summary>
+        private void OpenLiveStreamWindow()
+        {
+            try
+            {
+                var liveStreamWindow = new LiveVideoStreamWindow(_camera);
+
+                // Try to find the owner window (CameraInfoDialog)
+                var ownerWindow = Application.Current.Windows
+                    .OfType<Window>()
+                    .FirstOrDefault(w => w.IsActive && w is CameraInfoDialog);
+
+                if (ownerWindow != null)
+                {
+                    liveStreamWindow.Owner = ownerWindow;
+                }
+
+                liveStreamWindow.Show();
+
+                // Log the action
+                _camera.AddProtocolLog("Live Stream", "Open", "Live stream window opened", ProtocolLogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to open live stream window: {ex.Message}",
+                               "Error",
+                               MessageBoxButton.OK,
+                               MessageBoxImage.Error);
+
+                _camera.AddProtocolLog("Live Stream", "Open", $"Failed to open live stream: {ex.Message}", ProtocolLogLevel.Error);
+            }
+        }
 
         /// <summary>
         /// Copies all camera information to the clipboard in a formatted text
@@ -304,6 +357,7 @@ namespace wpfhikip.ViewModels.Dialogs
                 _camera.AddProtocolLog("Info Dialog", "Copy", $"Failed to copy information: {ex.Message}", ProtocolLogLevel.Error);
             }
         }
+
         /// <summary>
         /// Loads camera information from the device using generic ProtocolManager methods
         /// </summary>
@@ -373,6 +427,9 @@ namespace wpfhikip.ViewModels.Dialogs
                 IsLoading = false;
                 _loadingCancellation?.Dispose();
                 _loadingCancellation = null;
+
+                // Update live stream availability after loading
+                OnPropertyChanged(nameof(CanShowLiveStream));
             }
         }
 

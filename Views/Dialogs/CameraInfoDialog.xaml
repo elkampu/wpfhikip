@@ -47,6 +47,13 @@
 
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal">
+                    <Button Content="📹 Live Stream"
+                            Command="{Binding OpenLiveStreamCommand}"
+                            Style="{StaticResource SuccessButtonStyle}"
+                            Margin="0,0,8,0"
+                            ToolTip="Open live RTSP video stream"
+                            Visibility="{Binding CanShowLiveStream, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
                     <Button Content="🔄 Refresh"
                             Command="{Binding RefreshCommand}"
                             Style="{StaticResource SuccessButtonStyle}"

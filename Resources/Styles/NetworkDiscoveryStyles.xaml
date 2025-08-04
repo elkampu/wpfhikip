@@ -249,4 +249,111 @@
                 Value="32" />
     </Style>
 
+    <!-- Mode Description TextBlock Style -->
+    <Style x:Key="ModeDescriptionTextBlockStyle"
+           TargetType="TextBlock">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsDefaultMode}"
+                         Value="True">
+                <Setter Property="Text"
+                        Value="Default mode automatically selects optimal discovery methods and all available network segments." />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding IsCustomMode}"
+                         Value="True">
+                <Setter Property="Text"
+                        Value="Custom mode allows you to manually select specific discovery methods and network segments." />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Hover Border Style -->
+    <Style x:Key="HoverBorderStyle"
+           TargetType="Border">
+        <Setter Property="Background"
+                Value="Transparent" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver"
+                     Value="True">
+                <Setter Property="Background"
+                        Value="#f3f4f6" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Discovery Methods CheckBox Style -->
+    <Style x:Key="DiscoveryMethodsCheckBoxStyle"
+           TargetType="CheckBox"
+           BasedOn="{StaticResource {x:Type CheckBox}}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding DataContext.IsDefaultMode, RelativeSource={RelativeSource AncestorType=Window}}"
+                         Value="True">
+                <Setter Property="IsEnabled"
+                        Value="False" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Network Segments CheckBox Style -->
+    <Style x:Key="NetworkSegmentsCheckBoxStyle"
+           TargetType="CheckBox"
+           BasedOn="{StaticResource {x:Type CheckBox}}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding DataContext.IsDefaultMode, RelativeSource={RelativeSource AncestorType=Window}}"
+                         Value="True">
+                <Setter Property="IsEnabled"
+                        Value="False" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Auto Label Border Style -->
+    <Style x:Key="AutoLabelBorderStyle"
+           TargetType="Border">
+        <Setter Property="Visibility"
+                Value="Collapsed" />
+        <Style.Triggers>
+            <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding IsSelected}"
+                               Value="True" />
+                    <Condition Binding="{Binding DataContext.IsDefaultMode, RelativeSource={RelativeSource AncestorType=Window}}"
+                               Value="True" />
+                </MultiDataTrigger.Conditions>
+                <Setter Property="Visibility"
+                        Value="Visible" />
+            </MultiDataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Status Indicator Ellipse Style -->
+    <Style x:Key="StatusIndicatorEllipseStyle"
+           TargetType="Ellipse">
+        <Setter Property="Fill"
+                Value="#6b7280" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsScanning}"
+                         Value="True">
+                <Setter Property="Fill"
+                        Value="#16a34a" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Empty State Description TextBlock Style -->
+    <Style x:Key="EmptyStateDescriptionTextBlockStyle"
+           TargetType="TextBlock">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsDefaultMode}"
+                         Value="True">
+                <Setter Property="Text"
+                        Value="Click Start Scan to discover devices using default settings" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding IsCustomMode}"
+                         Value="True">
+                <Setter Property="Text"
+                        Value="Select discovery methods and network segments, then click Start Scan" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
 </ResourceDictionary>

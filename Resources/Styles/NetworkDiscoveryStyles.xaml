@@ -109,6 +109,87 @@
                 Value="White" />
     </Style>
 
+    <!-- Mode Radio Button Style -->
+    <Style x:Key="ModeRadioButtonStyle"
+           TargetType="RadioButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12,8"
+                            Cursor="Hand">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter TargetName="Border"
+                                    Property="Background"
+                                    Value="#f3f4f6" />
+                            <Setter TargetName="Border"
+                                    Property="BorderBrush"
+                                    Value="#9ca3af" />
+                        </Trigger>
+                        <Trigger Property="IsChecked"
+                                 Value="True">
+                            <Setter TargetName="Border"
+                                    Property="Background"
+                                    Value="#dbeafe" />
+                            <Setter TargetName="Border"
+                                    Property="BorderBrush"
+                                    Value="#2563eb" />
+                            <Setter Property="Foreground"
+                                    Value="#1e40af" />
+                            <Setter Property="FontWeight"
+                                    Value="Bold" />
+                        </Trigger>
+                        <Trigger Property="IsChecked"
+                                 Value="False">
+                            <Setter TargetName="Border"
+                                    Property="Background"
+                                    Value="{StaticResource SEC_White}" />
+                            <Setter TargetName="Border"
+                                    Property="BorderBrush"
+                                    Value="{StaticResource SEC_LightGrey}" />
+                            <Setter Property="Foreground"
+                                    Value="{StaticResource SEC_DarkGrey}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled"
+                                 Value="False">
+                            <Setter TargetName="Border"
+                                    Property="Background"
+                                    Value="#f9fafb" />
+                            <Setter TargetName="Border"
+                                    Property="BorderBrush"
+                                    Value="#e5e7eb" />
+                            <Setter Property="Foreground"
+                                    Value="#9ca3af" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="FontSize"
+                Value="12" />
+        <Setter Property="FontWeight"
+                Value="Medium" />
+        <Setter Property="HorizontalContentAlignment"
+                Value="Center" />
+        <Setter Property="VerticalContentAlignment"
+                Value="Center" />
+        <Setter Property="Padding"
+                Value="12,8" />
+        <Setter Property="Margin"
+                Value="2" />
+    </Style>
+
     <!-- Section Title Style -->
     <Style x:Key="SectionTitleStyle"
            TargetType="TextBlock">

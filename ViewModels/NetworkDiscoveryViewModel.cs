@@ -7,10 +7,8 @@ using wpfhikip.Discovery.Models;
 using wpfhikip.Discovery.Protocols.Arp;
 using wpfhikip.Discovery.Protocols.Icmp;
 using wpfhikip.Discovery.Protocols.Mdns;
-using wpfhikip.Discovery.Protocols.NetBios;
 using wpfhikip.Discovery.Protocols.OnvifProbe;
 using wpfhikip.Discovery.Protocols.PortScan;
-using wpfhikip.Discovery.Protocols.Snmp;
 using wpfhikip.Discovery.Protocols.Ssdp;
 using wpfhikip.Discovery.Protocols.WsDiscovery;
 using wpfhikip.ViewModels.Commands;
@@ -18,6 +16,15 @@ using wpfhikip.Views.Dialogs;
 
 namespace wpfhikip.ViewModels
 {
+    /// <summary>
+    /// Discovery modes available for network scanning
+    /// </summary>
+    public enum DiscoveryMode
+    {
+        Default,
+        Custom
+    }
+
     /// <summary>
     /// ViewModel for the Network Discovery tool
     /// </summary>
@@ -33,6 +40,7 @@ namespace wpfhikip.ViewModels
         private double _overallProgress = 0;
         private string _statusMessage = "Ready to scan";
         private int _totalDevicesFound = 0;
+        private DiscoveryMode _selectedDiscoveryMode = DiscoveryMode.Default;
 
         // Collections for filtered results
         private readonly ObservableCollection<DiscoveryResultsByMethod> _resultsByMethodFiltered = new();
@@ -71,7 +79,25 @@ namespace wpfhikip.ViewModels
             set => SetProperty(ref _totalDevicesFound, value);
         }
 
-        public bool HasSelectedMethods => DiscoveryMethods.Any(m => m.IsSelected);
+        public DiscoveryMode SelectedDiscoveryMode
+        {
+            get => _selectedDiscoveryMode;
+            set
+            {
+                if (SetProperty(ref _selectedDiscoveryMode, value))
+                {
+                    ApplyDiscoveryMode();
+                    OnPropertyChanged(nameof(IsDefaultMode));
+                    OnPropertyChanged(nameof(IsCustomMode));
+                    OnPropertyChanged(nameof(CanStartScan));
+                }
+            }
+        }
+
+        public bool IsDefaultMode => SelectedDiscoveryMode == DiscoveryMode.Default;
+        public bool IsCustomMode => SelectedDiscoveryMode == DiscoveryMode.Custom;
+
+        public bool HasSelectedMethods => IsDefaultMode || DiscoveryMethods.Any(m => m.IsSelected);
         public bool CanStartScan => !IsScanning && HasSelectedMethods;
         public bool HasResults => TotalDevicesFound > 0;
         public int ActiveMethodsCount => DiscoveryMethods.Count(m => m.IsRunning);
@@ -92,6 +118,8 @@ namespace wpfhikip.ViewModels
         public ICommand ExportResultsCommand { get; }
         public ICommand RefreshNetworksCommand { get; }
         public ICommand ShowScanProgressCommand { get; }
+        public ICommand SelectDefaultModeCommand { get; }
+        public ICommand SelectCustomModeCommand { get; }
 
         #endregion
 
@@ -111,10 +139,13 @@ namespace wpfhikip.ViewModels
             ExportResultsCommand = new RelayCommand(_ => ExportResults(), _ => TotalDevicesFound > 0);
             RefreshNetworksCommand = new RelayCommand(_ => RefreshNetworkSegments());
             ShowScanProgressCommand = new RelayCommand(_ => ShowScanProgress());
+            SelectDefaultModeCommand = new RelayCommand(_ => SelectedDiscoveryMode = DiscoveryMode.Default);
+            SelectCustomModeCommand = new RelayCommand(_ => SelectedDiscoveryMode = DiscoveryMode.Custom);
 
             InitializeDiscoveryMethods();
             RefreshNetworkSegments();
             SetupPropertyChangeSubscriptions();
+            ApplyDiscoveryMode(); // Apply default mode settings
         }
 
         #region Private Methods
@@ -130,8 +161,6 @@ namespace wpfhikip.ViewModels
                 (DiscoveryMethod.mDNS, () => new MdnsDiscoveryService()),
                 (DiscoveryMethod.ARP, () => new ArpDiscoveryService()),
                 (DiscoveryMethod.ICMP, () => new IcmpDiscoveryService()),
-                (DiscoveryMethod.SNMP, () => new SnmpDiscoveryService()),
-                (DiscoveryMethod.NetBIOS, () => new NetBiosDiscoveryService()),
                 (DiscoveryMethod.ONVIFProbe, () => new OnvifProbeDiscoveryService())
             };
 
@@ -184,7 +213,7 @@ namespace wpfhikip.ViewModels
                 {
                     foreach (var address in kvp.Value.IPv4Addresses)
                     {
-                        NetworkSegments.Add(new NetworkSegment
+                        var segment = new NetworkSegment
                         {
                             Network = $"{address.NetworkAddress}/{address.PrefixLength}",
                             Description = kvp.Value.Description,
@@ -193,8 +222,10 @@ namespace wpfhikip.ViewModels
                             InterfaceType = kvp.Value.Type,
                             Speed = kvp.Value.Speed,
                             MacAddress = kvp.Value.MacAddress,
-                            AddressInfo = address
-                        });
+                            AddressInfo = address,
+                            IsSelected = true // Default mode: select all networks
+                        };
+                        NetworkSegments.Add(segment);
                     }
                 }
 
@@ -208,7 +239,8 @@ namespace wpfhikip.ViewModels
                         {
                             Network = segment,
                             Description = "Default Network Range",
-                            InterfaceName = "Default"
+                            InterfaceName = "Default",
+                            IsSelected = true
                         });
                     }
                 }
@@ -218,6 +250,38 @@ namespace wpfhikip.ViewModels
                 StatusMessage = $"Error refreshing network segments: {ex.Message}";
             }
 
+            OnPropertyChanged(nameof(SelectedNetworksCount));
+        }
+
+        private void ApplyDiscoveryMode()
+        {
+            if (IsDefaultMode)
+            {
+                // Default mode: Use predefined methods for comprehensive discovery
+                var defaultMethods = new DiscoveryMethod[]
+                {
+                    DiscoveryMethod.SSDP,
+                    DiscoveryMethod.WSDiscovery,
+                    DiscoveryMethod.ARP,
+                    DiscoveryMethod.ICMP,
+                    DiscoveryMethod.mDNS
+                };
+
+                foreach (var method in DiscoveryMethods)
+                {
+                    method.IsSelected = method.IsEnabled && defaultMethods.Contains(method.Method);
+                }
+
+                // Select all available network segments
+                foreach (var network in NetworkSegments)
+                {
+                    network.IsSelected = true;
+                }
+            }
+            // Custom mode: User controls selections (no automatic changes)
+
+            OnPropertyChanged(nameof(HasSelectedMethods));
+            OnPropertyChanged(nameof(SelectedMethodsCount));
             OnPropertyChanged(nameof(SelectedNetworksCount));
         }
 
@@ -256,7 +320,10 @@ namespace wpfhikip.ViewModels
                 _cancellationTokenSource = new CancellationTokenSource();
                 ClearResults();
 
-                var selectedMethods = DiscoveryMethods.Where(m => m.IsSelected && m.IsEnabled).ToList();
+                var selectedMethods = IsDefaultMode
+                    ? DiscoveryMethods.Where(m => m.IsSelected && m.IsEnabled).ToList()
+                    : DiscoveryMethods.Where(m => m.IsSelected && m.IsEnabled).ToList();
+
                 var selectedNetworks = NetworkSegments.Where(n => n.IsSelected).Select(n => n.Network).ToList();
 
                 if (!selectedMethods.Any())
@@ -266,7 +333,7 @@ namespace wpfhikip.ViewModels
                     return;
                 }
 
-                StatusMessage = $"Starting scan with {selectedMethods.Count} methods...";
+                StatusMessage = $"Starting {(IsDefaultMode ? "default" : "custom")} scan with {selectedMethods.Count} methods...";
                 var tasks = await StartDiscoveryTasks(selectedMethods, selectedNetworks);
                 await Task.WhenAll(tasks);
 
@@ -423,14 +490,20 @@ namespace wpfhikip.ViewModels
 
         private void SetMethodSelection(bool selected)
         {
-            foreach (var method in DiscoveryMethods.Where(m => m.IsEnabled))
-                method.IsSelected = selected;
+            if (IsCustomMode) // Only allow manual selection in custom mode
+            {
+                foreach (var method in DiscoveryMethods.Where(m => m.IsEnabled))
+                    method.IsSelected = selected;
+            }
         }
 
         private void SetNetworkSelection(bool selected)
         {
-            foreach (var network in NetworkSegments)
-                network.IsSelected = selected;
+            if (IsCustomMode) // Only allow manual selection in custom mode
+            {
+                foreach (var network in NetworkSegments)
+                    network.IsSelected = selected;
+            }
         }
 
         private void ExportResults()

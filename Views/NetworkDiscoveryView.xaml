@@ -106,6 +106,63 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Discovery Mode Selection -->
+                <Border Style="{StaticResource ModernCardStyle}"
+                        Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="Discovery Mode"
+                                   Style="{StaticResource SectionTitleStyle}"
+                                   Margin="0,0,0,12" />
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <RadioButton Grid.Column="0"
+                                         Content="Default"
+                                         GroupName="DiscoveryMode"
+                                         IsChecked="{Binding IsDefaultMode, Mode=OneWay}"
+                                         Command="{Binding SelectDefaultModeCommand}"
+                                         Style="{StaticResource ModeRadioButtonStyle}"
+                                         Margin="0,0,4,0"
+                                         ToolTip="Uses predefined methods for comprehensive discovery" />
+
+                            <RadioButton Grid.Column="1"
+                                         Content="Custom"
+                                         GroupName="DiscoveryMode"
+                                         IsChecked="{Binding IsCustomMode, Mode=OneWay}"
+                                         Command="{Binding SelectCustomModeCommand}"
+                                         Style="{StaticResource ModeRadioButtonStyle}"
+                                         Margin="4,0,0,0"
+                                         ToolTip="Allows manual selection of methods and networks" />
+                        </Grid>
+
+                        <TextBlock Margin="0,4,0,0"
+                                   FontSize="11"
+                                   Foreground="{StaticResource SEC_MidGrey}"
+                                   TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsDefaultMode}"
+                                                     Value="True">
+                                            <Setter Property="Text"
+                                                    Value="Default mode automatically selects optimal discovery methods and all available network segments." />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsCustomMode}"
+                                                     Value="True">
+                                            <Setter Property="Text"
+                                                    Value="Custom mode allows you to manually select specific discovery methods and network segments." />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
                 <!-- Discovery Methods -->
                 <Border Style="{StaticResource ModernCardStyle}"
                         Margin="0,0,0,16">
@@ -114,7 +171,8 @@
                             <TextBlock Text="Discovery Methods"
                                        Style="{StaticResource SectionTitleStyle}" />
                             <StackPanel HorizontalAlignment="Right"
-                                        Orientation="Horizontal">
+                                        Orientation="Horizontal"
+                                        Visibility="{Binding IsCustomMode, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <Button Content="All"
                                         Command="{Binding SelectAllMethodsCommand}"
                                         Style="{StaticResource SecondaryButtonStyle}"
@@ -162,7 +220,20 @@
                                                           IsChecked="{Binding IsSelected}"
                                                           IsEnabled="{Binding IsEnabled}"
                                                           VerticalAlignment="Center"
-                                                          Margin="0,0,8,0" />
+                                                          Margin="0,0,8,0">
+                                                    <CheckBox.Style>
+                                                        <Style TargetType="CheckBox"
+                                                               BasedOn="{StaticResource {x:Type CheckBox}}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding DataContext.IsDefaultMode, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                             Value="True">
+                                                                    <Setter Property="IsEnabled"
+                                                                            Value="False" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </CheckBox.Style>
+                                                </CheckBox>
 
                                                 <StackPanel Grid.Column="1">
                                                     <TextBlock Text="{Binding Name}"
@@ -196,6 +267,33 @@
                                                                    Foreground="#7f1d1d"
                                                                    FontWeight="Bold" />
                                                     </Border>
+                                                    <Border Background="#dcfce7"
+                                                            Padding="4,2"
+                                                            CornerRadius="3"
+                                                            Margin="4,0">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Visibility"
+                                                                        Value="Collapsed" />
+                                                                <Style.Triggers>
+                                                                    <MultiDataTrigger>
+                                                                        <MultiDataTrigger.Conditions>
+                                                                            <Condition Binding="{Binding IsSelected}"
+                                                                                       Value="True" />
+                                                                            <Condition Binding="{Binding DataContext.IsDefaultMode, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                       Value="True" />
+                                                                        </MultiDataTrigger.Conditions>
+                                                                        <Setter Property="Visibility"
+                                                                                Value="Visible" />
+                                                                    </MultiDataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <TextBlock Text="Auto"
+                                                                   FontSize="9"
+                                                                   Foreground="#15803d"
+                                                                   FontWeight="Bold" />
+                                                    </Border>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -213,7 +311,8 @@
                             <TextBlock Text="Network Segments"
                                        Style="{StaticResource SectionTitleStyle}" />
                             <StackPanel HorizontalAlignment="Right"
-                                        Orientation="Horizontal">
+                                        Orientation="Horizontal"
+                                        Visibility="{Binding IsCustomMode, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <Button Content="🔄"
                                         Command="{Binding RefreshNetworksCommand}"
                                         Style="{StaticResource SecondaryButtonStyle}"
@@ -268,7 +367,20 @@
                                                     <CheckBox Grid.Column="0"
                                                               IsChecked="{Binding IsSelected}"
                                                               VerticalAlignment="Center"
-                                                              Margin="0,0,8,0" />
+                                                              Margin="0,0,8,0">
+                                                        <CheckBox.Style>
+                                                            <Style TargetType="CheckBox"
+                                                                   BasedOn="{StaticResource {x:Type CheckBox}}">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding DataContext.IsDefaultMode, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                 Value="True">
+                                                                        <Setter Property="IsEnabled"
+                                                                                Value="False" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </CheckBox.Style>
+                                                    </CheckBox>
                                                     <TextBlock Grid.Column="1"
                                                                Text="{Binding Network}"
                                                                FontWeight="Medium"
@@ -436,10 +548,28 @@
                                        Foreground="{StaticResource SEC_MidGrey}"
                                        HorizontalAlignment="Center"
                                        Margin="0,8,0,4" />
-                            <TextBlock Text="Select discovery methods and network segments, then click Start Scan"
-                                       FontSize="14"
+                            <TextBlock FontSize="14"
                                        Foreground="{StaticResource SEC_MidGrey}"
-                                       HorizontalAlignment="Center" />
+                                       HorizontalAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDefaultMode}"
+                                                         Value="True">
+                                                <Setter Property="Text"
+                                                        Value="Click Start Scan to discover devices using default settings" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsCustomMode}"
+                                                         Value="True">
+                                                <Setter Property="Text"
+                                                        Value="Select discovery methods and network segments, then click Start Scan" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
                     </Grid>
                 </Grid>
